@@ -19,7 +19,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    user_role_enum = postgresql.ENUM("admin", "hr", "candidate", name="userrole")
+    user_role_enum = postgresql.ENUM("admin", "hr", "candidate", name="userrole", create_type=False)
     user_role_enum.create(op.get_bind(), checkfirst=True)
 
     op.create_table(
@@ -27,7 +27,7 @@ def upgrade() -> None:
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
         sa.Column("email", sa.String(length=255), nullable=False),
         sa.Column("password_hash", sa.String(length=255), nullable=False),
-        sa.Column("role", sa.Enum("admin", "hr", "candidate", name="userrole"), nullable=False),
+        sa.Column("role", user_role_enum, nullable=False),
         sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("true")),
         sa.Column("is_verified", sa.Boolean(), nullable=False, server_default=sa.text("false")),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
@@ -77,5 +77,5 @@ def downgrade() -> None:
     op.drop_index("ix_users_email", table_name="users")
     op.drop_table("users")
 
-    user_role_enum = postgresql.ENUM("admin", "hr", "candidate", name="userrole")
+    user_role_enum = postgresql.ENUM("admin", "hr", "candidate", name="userrole", create_type=False)
     user_role_enum.drop(op.get_bind(), checkfirst=True)
