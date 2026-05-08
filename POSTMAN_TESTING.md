@@ -1,72 +1,48 @@
-# Jobify Auth API ni Postman orqali test qilish
+# Postman orqali test qilish
 
-Bu qo'llanma `Jobify Auth API` endpointlarini Postman'da qanday chaqirish, qaysi JSON body yozish va tokenlarni qanday saqlashni ko'rsatadi.
-
-## 1. API ni ishga tushirish
-
-1. `.env.example` faylidan `.env` yarating.
-2. Docker orqali ishga tushiring:
+API ni ishga tushirish:
 
 ```bash
 docker compose up --build
 ```
 
-API ishga tushgandan keyin:
-
-- Swagger: `http://localhost:8000/docs`
-- Base URL: `http://localhost:8000`
-- Auth prefix: `/api/auth`
-
-Email uchun SMTP sozlanmagan bo'lsa, verification/reset kodlar `celery-worker` logida chiqadi:
+Asosiy manzil:
 
 ```text
-[EMAIL-DEV][CELERY] To=test@example.com | Subject=... | Body=Sizning tasdiqlash kodingiz: 123456
+http://127.0.0.1:8000
 ```
 
-Shu 6 xonali kodni Postman environment ichidagi `verification_code` yoki `reset_code` qiymatiga qo'ying.
+Verification code va reset code emailga yuboriladi. Agar SMTP sozlanmagan bo'lsa, kod `celery-worker` logida chiqadi.
 
-## 2. Tayyor Postman fayllar
-
-Repo ichida tayyor import fayllar bor:
-
-- `postman/Jobify_Auth_API.postman_collection.json`
-- `postman/Jobify_Auth_API.postman_environment.json`
-
-Postman'da:
-
-1. `Import` tugmasini bosing.
-2. Ikkala JSON faylni import qiling.
-3. Environment sifatida `Jobify Auth API - Local` ni tanlang.
-4. Requestlarni pastdagi tartibda yuboring.
-
-## 3. Environment variable'lar
-
-Postman environment ichida quyidagi variable'lar ishlatiladi:
-
-| Variable | Ma'nosi |
-| --- | --- |
-| `base_url` | API hosti, default: `http://localhost:8000` |
-| `email` | Test user emaili |
-| `password` | Test user paroli |
-| `new_password` | Change password uchun yangi parol |
-| `reset_new_password` | Reset password uchun yangi parol |
-| `role` | `candidate` yoki `hr`; `admin` oddiy register orqali yaratilmaydi |
-| `verification_code` | Email tasdiqlash kodi |
-| `reset_code` | Password reset kodi |
-| `access_token` | Login/refresh javobidan avtomatik saqlanadi |
-| `refresh_token` | Login/refresh javobidan avtomatik saqlanadi |
-
-## 4. Test qilish tartibi
-
-### 4.1. Health check
-
-**Method:** `GET`
+Masalan:
 
 ```text
-{{base_url}}/
+[EMAIL-DEV][CELERY] To=candidate@example.com | Subject=... | Body=Sizning tasdiqlash kodingiz: 123456
 ```
 
-Kutilgan javob:
+Shu `123456` kodni Postman body ichida ishlatasiz.
+
+---
+
+## 1. API ishlayotganini tekshirish
+
+Postman:
+
+Method → GET
+
+URL:
+
+```text
+http://127.0.0.1:8000/
+```
+
+Body:
+
+```text
+Body kerak emas
+```
+
+Natija:
 
 ```json
 {
@@ -74,185 +50,241 @@ Kutilgan javob:
 }
 ```
 
-### 4.2. Register
+---
 
-**Method:** `POST`
+## 2. Register qilish
+
+Postman:
+
+Method → POST
+
+URL:
 
 ```text
-{{base_url}}/api/auth/register/
+http://127.0.0.1:8000/api/auth/register/
 ```
 
-**Headers:**
-
-```text
-Content-Type: application/json
-```
-
-**Body:**
+Body:
 
 ```json
 {
-  "email": "{{email}}",
-  "password": "{{password}}",
-  "confirm_password": "{{password}}",
-  "role": "{{role}}"
+  "email": "candidate@example.com",
+  "password": "Password123!",
+  "confirm_password": "Password123!",
+  "role": "candidate"
 }
 ```
 
-Izoh:
-
-- `password` kamida 8 ta belgidan iborat bo'lishi kerak.
-- `role` qiymati `candidate` yoki `hr` bo'lishi mumkin.
-- `admin` role bilan register qilish taqiqlangan.
-- Javobdan keyin verification code emailga yoki Celery logiga chiqadi.
-
-**Tests tab script:**
-
-```javascript
-pm.test("Register status is 201", function () {
-  pm.response.to.have.status(201);
-});
-
-pm.test("Register response has user and message", function () {
-  const json = pm.response.json();
-  pm.expect(json).to.have.property("user");
-  pm.expect(json.user.email).to.eql(pm.environment.get("email"));
-  pm.expect(json.user.is_verified).to.eql(false);
-});
-```
-
-### 4.3. Verify email
-
-Avval Celery logidan 6 xonali kodni olib, Postman environment'dagi `verification_code` variable'ga yozing.
-
-**Method:** `POST`
-
-```text
-{{base_url}}/api/auth/verify-email/
-```
-
-**Body:**
+Natija:
 
 ```json
 {
-  "email": "{{email}}",
-  "code": "{{verification_code}}"
+  "user": {
+    "id": "user_id",
+    "email": "candidate@example.com",
+    "role": "candidate",
+    "is_active": true,
+    "is_verified": false,
+    "created_at": "2026-05-08T10:00:00"
+  },
+  "message": "Email verification code sent."
 }
 ```
 
-**Tests tab script:**
-
-```javascript
-pm.test("Email verified", function () {
-  pm.response.to.have.status(200);
-  pm.expect(pm.response.json().message).to.eql("Email verified successfully.");
-});
-```
-
-### 4.4. Resend verification code
-
-Bu endpoint faqat hali verify bo'lmagan user uchun kerak.
-
-**Method:** `POST`
+Eslatma:
 
 ```text
-{{base_url}}/api/auth/resend-verification-code/
+role faqat candidate yoki hr bo'ladi.
+admin bilan register qilib bo'lmaydi.
 ```
 
-**Body:**
+---
+
+## 3. Email tasdiqlash
+
+Postman:
+
+Method → POST
+
+URL:
+
+```text
+http://127.0.0.1:8000/api/auth/verify-email/
+```
+
+Body:
 
 ```json
 {
-  "email": "{{email}}"
+  "email": "candidate@example.com",
+  "code": "123456"
 }
 ```
 
-Izoh:
-
-- 1 daqiqada ko'p yuborilsa `429 Too Many Requests` qaytadi.
-- User allaqachon verify bo'lgan bo'lsa `400 User already verified` qaytadi.
-
-### 4.5. Login
-
-**Method:** `POST`
-
-```text
-{{base_url}}/api/auth/login/
-```
-
-**Body:**
+Natija:
 
 ```json
 {
-  "email": "{{email}}",
-  "password": "{{password}}"
+  "message": "Email verified successfully."
 }
 ```
 
-Javobda `access_token` va `refresh_token` keladi. Ularni keyingi requestlar uchun environment'ga avtomatik saqlash kerak.
-
-**Tests tab script:**
-
-```javascript
-pm.test("Login status is 200", function () {
-  pm.response.to.have.status(200);
-});
-
-pm.test("Save access and refresh tokens", function () {
-  const json = pm.response.json();
-  pm.expect(json).to.have.property("access_token");
-  pm.expect(json).to.have.property("refresh_token");
-  pm.environment.set("access_token", json.access_token);
-  pm.environment.set("refresh_token", json.refresh_token);
-});
-```
-
-### 4.6. Auth talab qiladigan requestlar
-
-`/me`, `/logout-all`, `/change-password`, role-based endpointlar uchun header kerak:
+Eslatma:
 
 ```text
-Authorization: Bearer {{access_token}}
+123456 o'rniga celery-worker logida chiqqan verification code yoziladi.
 ```
 
-Postman'da buni requestning `Authorization` tabida ham berish mumkin:
+---
 
-- Type: `Bearer Token`
-- Token: `{{access_token}}`
+## 4. Verification code qayta yuborish
 
-### 4.7. Get current user
+Postman:
 
-**Method:** `GET`
+Method → POST
+
+URL:
 
 ```text
-{{base_url}}/api/auth/me/
+http://127.0.0.1:8000/api/auth/resend-verification-code/
 ```
 
-**Authorization:** `Bearer {{access_token}}`
+Body:
 
-**Tests tab script:**
-
-```javascript
-pm.test("Current user returned", function () {
-  pm.response.to.have.status(200);
-  const json = pm.response.json();
-  pm.expect(json.email).to.eql(pm.environment.get("email"));
-});
+```json
+{
+  "email": "candidate@example.com"
+}
 ```
 
-### 4.8. Role-based endpointlar
+Natija:
 
-Candidate user uchun:
+```json
+{
+  "message": "Verification code sent."
+}
+```
 
-**Method:** `GET`
+Eslatma:
 
 ```text
-{{base_url}}/api/auth/candidate-only/
+Bu faqat user hali verify bo'lmagan bo'lsa ishlaydi.
 ```
 
-**Authorization:** `Bearer {{access_token}}`
+---
 
-Kutilgan javob:
+## 5. Login qilish
+
+Postman:
+
+Method → POST
+
+URL:
+
+```text
+http://127.0.0.1:8000/api/auth/login/
+```
+
+Body:
+
+```json
+{
+  "email": "candidate@example.com",
+  "password": "Password123!"
+}
+```
+
+Natija:
+
+```json
+{
+  "access_token": "access_token_value",
+  "refresh_token": "refresh_token_value",
+  "token_type": "bearer",
+  "user": {
+    "id": "user_id",
+    "email": "candidate@example.com",
+    "role": "candidate",
+    "is_active": true,
+    "is_verified": true,
+    "created_at": "2026-05-08T10:00:00"
+  }
+}
+```
+
+Eslatma:
+
+```text
+access_token ni keyingi requestlarda Authorization header ichida ishlatasiz.
+refresh_token ni refresh va logout uchun ishlatasiz.
+```
+
+---
+
+## 6. Profilni ko'rish
+
+Postman:
+
+Method → GET
+
+URL:
+
+```text
+http://127.0.0.1:8000/api/auth/me/
+```
+
+Headers:
+
+```text
+Authorization: Bearer access_token_value
+```
+
+Body:
+
+```text
+Body kerak emas
+```
+
+Natija:
+
+```json
+{
+  "id": "user_id",
+  "email": "candidate@example.com",
+  "role": "candidate",
+  "is_active": true,
+  "is_verified": true,
+  "created_at": "2026-05-08T10:00:00"
+}
+```
+
+---
+
+## 7. Candidate endpoint
+
+Postman:
+
+Method → GET
+
+URL:
+
+```text
+http://127.0.0.1:8000/api/auth/candidate-only/
+```
+
+Headers:
+
+```text
+Authorization: Bearer access_token_value
+```
+
+Body:
+
+```text
+Body kerak emas
+```
+
+Natija:
 
 ```json
 {
@@ -260,111 +292,187 @@ Kutilgan javob:
 }
 ```
 
-HR user uchun:
+---
+
+## 8. HR endpoint
+
+Postman:
+
+Method → GET
+
+URL:
 
 ```text
-GET {{base_url}}/api/auth/hr-only/
+http://127.0.0.1:8000/api/auth/hr-only/
 ```
 
-Admin uchun:
+Headers:
 
 ```text
-GET {{base_url}}/api/auth/admin-only/
+Authorization: Bearer access_token_value
 ```
 
-Izoh:
-
-- Oddiy `/register/` orqali `admin` yaratib bo'lmaydi.
-- Role mos kelmasa `403 Permission denied` qaytadi.
-
-### 4.9. Refresh token
-
-**Method:** `POST`
+Body:
 
 ```text
-{{base_url}}/api/auth/refresh/
+Body kerak emas
 ```
 
-**Body:**
+Natija:
 
 ```json
 {
-  "refresh_token": "{{refresh_token}}"
+  "message": "Welcome HR. You can access this endpoint."
 }
 ```
 
-Bu endpoint refresh token rotation qiladi: eski refresh token bekor bo'ladi va yangisi beriladi.
-
-**Tests tab script:**
-
-```javascript
-pm.test("Refresh status is 200", function () {
-  pm.response.to.have.status(200);
-});
-
-pm.test("Save rotated tokens", function () {
-  const json = pm.response.json();
-  pm.environment.set("access_token", json.access_token);
-  pm.environment.set("refresh_token", json.refresh_token);
-});
-```
-
-### 4.10. Change password
-
-**Method:** `POST`
+Eslatma:
 
 ```text
-{{base_url}}/api/auth/change-password/
+Bu endpoint ishlashi uchun user role hr bo'lishi kerak.
 ```
 
-**Authorization:** `Bearer {{access_token}}`
+---
 
-**Body:**
+## 9. Admin endpoint
+
+Postman:
+
+Method → GET
+
+URL:
+
+```text
+http://127.0.0.1:8000/api/auth/admin-only/
+```
+
+Headers:
+
+```text
+Authorization: Bearer access_token_value
+```
+
+Body:
+
+```text
+Body kerak emas
+```
+
+Natija:
 
 ```json
 {
-  "old_password": "{{password}}",
-  "new_password": "{{new_password}}",
-  "confirm_new_password": "{{new_password}}"
+  "message": "Welcome Admin. You can access this endpoint."
 }
 ```
 
-Izoh:
-
-- Yangi parol kamida 8 ta belgidan iborat bo'lishi kerak.
-- Yangi parol eski parol bilan bir xil bo'lmasligi kerak.
-- Password o'zgargandan keyin eski refresh tokenlar revoke qilinadi.
-
-**Tests tab script:**
-
-```javascript
-pm.test("Password changed", function () {
-  pm.response.to.have.status(200);
-  pm.expect(pm.response.json().message).to.eql("Password changed successfully.");
-});
-
-if (pm.response.code === 200) {
-  pm.environment.set("password", pm.environment.get("new_password"));
-}
-```
-
-### 4.11. Forgot password
-
-**Method:** `POST`
+Eslatma:
 
 ```text
-{{base_url}}/api/auth/forgot-password/
+Oddiy register orqali admin yaratib bo'lmaydi.
+Role admin bo'lmasa 403 Permission denied qaytadi.
 ```
 
-**Body:**
+---
+
+## 10. Access token yangilash
+
+Postman:
+
+Method → POST
+
+URL:
+
+```text
+http://127.0.0.1:8000/api/auth/refresh/
+```
+
+Body:
 
 ```json
 {
-  "email": "{{email}}"
+  "refresh_token": "refresh_token_value"
 }
 ```
 
-Javob:
+Natija:
+
+```json
+{
+  "access_token": "new_access_token_value",
+  "refresh_token": "new_refresh_token_value",
+  "token_type": "bearer"
+}
+```
+
+Eslatma:
+
+```text
+Refresh qilgandan keyin eski refresh_token ishlamaydi.
+Yangi refresh_token ni saqlab qo'yish kerak.
+```
+
+---
+
+## 11. Parolni o'zgartirish
+
+Postman:
+
+Method → POST
+
+URL:
+
+```text
+http://127.0.0.1:8000/api/auth/change-password/
+```
+
+Headers:
+
+```text
+Authorization: Bearer access_token_value
+```
+
+Body:
+
+```json
+{
+  "old_password": "Password123!",
+  "new_password": "NewPassword123!",
+  "confirm_new_password": "NewPassword123!"
+}
+```
+
+Natija:
+
+```json
+{
+  "message": "Password changed successfully."
+}
+```
+
+---
+
+## 12. Parolni tiklash kodi yuborish
+
+Postman:
+
+Method → POST
+
+URL:
+
+```text
+http://127.0.0.1:8000/api/auth/forgot-password/
+```
+
+Body:
+
+```json
+{
+  "email": "candidate@example.com"
+}
+```
+
+Natija:
 
 ```json
 {
@@ -372,57 +480,74 @@ Javob:
 }
 ```
 
-Reset code Celery logida chiqadi. Uni environment'dagi `reset_code` variable'ga yozing.
-
-### 4.12. Reset password
-
-**Method:** `POST`
+Eslatma:
 
 ```text
-{{base_url}}/api/auth/reset-password/
+Reset code celery-worker logida chiqadi.
 ```
 
-**Body:**
+---
+
+## 13. Parolni reset qilish
+
+Postman:
+
+Method → POST
+
+URL:
+
+```text
+http://127.0.0.1:8000/api/auth/reset-password/
+```
+
+Body:
 
 ```json
 {
-  "email": "{{email}}",
-  "code": "{{reset_code}}",
-  "new_password": "{{reset_new_password}}",
-  "confirm_new_password": "{{reset_new_password}}"
+  "email": "candidate@example.com",
+  "code": "123456",
+  "new_password": "ResetPassword123!",
+  "confirm_new_password": "ResetPassword123!"
 }
 ```
 
-**Tests tab script:**
-
-```javascript
-pm.test("Password reset", function () {
-  pm.response.to.have.status(200);
-  pm.expect(pm.response.json().message).to.eql("Password reset successfully.");
-});
-
-if (pm.response.code === 200) {
-  pm.environment.set("password", pm.environment.get("reset_new_password"));
-}
-```
-
-### 4.13. Logout
-
-**Method:** `POST`
-
-```text
-{{base_url}}/api/auth/logout/
-```
-
-**Body:**
+Natija:
 
 ```json
 {
-  "refresh_token": "{{refresh_token}}"
+  "message": "Password reset successfully."
 }
 ```
 
-Javob:
+Eslatma:
+
+```text
+123456 o'rniga celery-worker logida chiqqan reset code yoziladi.
+```
+
+---
+
+## 14. Logout qilish
+
+Postman:
+
+Method → POST
+
+URL:
+
+```text
+http://127.0.0.1:8000/api/auth/logout/
+```
+
+Body:
+
+```json
+{
+  "refresh_token": "refresh_token_value"
+}
+```
+
+Natija:
 
 ```json
 {
@@ -430,52 +555,36 @@ Javob:
 }
 ```
 
-### 4.14. Logout all devices
+---
 
-**Method:** `POST`
+## 15. Hamma qurilmalardan logout qilish
+
+Postman:
+
+Method → POST
+
+URL:
 
 ```text
-{{base_url}}/api/auth/logout-all/
+http://127.0.0.1:8000/api/auth/logout-all/
 ```
 
-**Authorization:** `Bearer {{access_token}}`
+Headers:
 
-Javob namunasi:
+```text
+Authorization: Bearer access_token_value
+```
+
+Body:
+
+```text
+Body kerak emas
+```
+
+Natija:
 
 ```json
 {
   "message": "All devices logged out. Revoked tokens: 1"
 }
 ```
-
-## 5. Tez uchraydigan xatolar
-
-| Status | Sabab |
-| --- | --- |
-| `400 Invalid verification code` | `verification_code` noto'g'ri yoki eski |
-| `400 User already verified` | Verify bo'lgan userga resend qilinyapti |
-| `401 Invalid credentials` | Email/parol noto'g'ri |
-| `401 Invalid access token` | `access_token` noto'g'ri yoki muddati o'tgan |
-| `401 Refresh token expired or revoked` | Eski refresh token ishlatildi |
-| `403 Email is not verified` | Login qilishdan oldin email verify qilinmagan |
-| `403 Permission denied` | Role endpoint user role'iga mos emas |
-| `409 Email already exists` | Shu email bilan user bor |
-| `422` | JSON body maydonlari noto'g'ri yoki parol uzunligi yetarli emas |
-| `429 Too Many Requests` | Rate limitga tushib qoldingiz |
-
-## 6. Tavsiya etilgan collection run ketma-ketligi
-
-1. `Health Check`
-2. `Register`
-3. Celery logidan verification code oling va `verification_code` ga yozing.
-4. `Verify Email`
-5. `Login`
-6. `Get Current User`
-7. `Candidate Only` yoki `HR Only`
-8. `Refresh Token`
-9. `Change Password`
-10. `Forgot Password`
-11. Celery logidan reset code oling va `reset_code` ga yozing.
-12. `Reset Password`
-13. `Login` - yangi parol bilan tekshirish uchun
-14. `Logout`
