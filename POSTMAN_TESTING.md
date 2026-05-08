@@ -479,4 +479,3 @@ Javob namunasi:
 12. `Reset Password`
 13. `Login` - yangi parol bilan tekshirish uchun
 14. `Logout`
-
