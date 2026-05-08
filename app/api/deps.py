@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
@@ -23,7 +25,8 @@ async def get_current_user(
     if payload.get("token_type") != "access":
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token type.")
 
-    result = await db.execute(select(User).where(User.id == payload.get("user_id")))
+    user_id = _parse_token_user_id(payload.get("user_id"))
+    result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
@@ -39,3 +42,10 @@ def require_role(*roles: UserRole):
         return current_user
 
     return checker
+
+
+def _parse_token_user_id(raw_user_id: object) -> UUID:
+    try:
+        return UUID(str(raw_user_id))
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid access token.") from exc

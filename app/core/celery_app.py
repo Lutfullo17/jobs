@@ -14,6 +14,5 @@ celery_app.conf.update(
     accept_content=["json"],
     timezone="UTC",
     enable_utc=True,
+    imports=("app.tasks.email_tasks",),
 )
-
-celery_app.autodiscover_tasks(["app.tasks"])

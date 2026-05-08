@@ -18,8 +18,9 @@ def send_email_task(to_email: str, subject: str, body: str) -> None:
     message["Subject"] = subject
     message.set_content(body)
 
-    with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as server:
-        if settings.smtp_use_starttls:
+    smtp_client = smtplib.SMTP_SSL if settings.smtp_use_tls else smtplib.SMTP
+    with smtp_client(settings.smtp_host, settings.smtp_port) as server:
+        if not settings.smtp_use_tls and settings.smtp_use_starttls:
             server.starttls()
         server.login(settings.smtp_user, settings.smtp_password)
         server.send_message(message)

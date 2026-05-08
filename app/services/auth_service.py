@@ -1,5 +1,5 @@
 from datetime import UTC, datetime, timedelta
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from fastapi import HTTPException, status
 from sqlalchemy import and_, select, update
@@ -141,7 +141,7 @@ async def login_user(
 
 async def refresh_access_token(db: AsyncSession, refresh_token: str) -> tuple[str, str]:
     payload = _decode_refresh_token(refresh_token)
-    user_id = payload["user_id"]
+    user_id = _parse_token_user_id(payload.get("user_id"))
 
     user_result = await db.execute(select(User).where(User.id == user_id))
     user = user_result.scalar_one_or_none()
@@ -181,7 +181,7 @@ async def logout(db: AsyncSession, refresh_token: str) -> None:
         await db.commit()
 
 
-async def logout_all_devices(db: AsyncSession, user_id: str) -> int:
+async def logout_all_devices(db: AsyncSession, user_id: UUID) -> int:
     result = await db.execute(
         update(RefreshToken)
         .where(and_(RefreshToken.user_id == user_id, RefreshToken.revoked_at.is_(None)))
@@ -295,3 +295,10 @@ def _decode_refresh_token(refresh_token: str) -> dict:
     if payload.get("token_type") != "refresh":
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token type.")
     return payload
+
+
+def _parse_token_user_id(raw_user_id: object) -> UUID:
+    try:
+        return UUID(str(raw_user_id))
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token.") from exc
