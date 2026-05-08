@@ -1,0 +1,35 @@
+<component name="InspectionProjectProfileManager">
+  <profile version="1.0">
+    <option name="myName" value="Project Default" />
+    <inspection_tool class="PyPackageRequirementsInspection" enabled="true" level="WARNING" enabled_by_default="true">
+      <option name="ignoredPackages">
+        <list>
+          <option value="Django" />
+          <option value="celery" />
+          <option value="django-celery-beat" />
+          <option value="redis" />
+          <option value="requests" />
+          <option value="Pillow" />
+          <option value="django-crispy-forms" />
+          <option value="crispy-bootstrap5" />
+          <option value="python-decouple" />
+          <option value="psycopg2-binary" />
+          <option value="fastapi" />
+          <option value="uvicorn" />
+          <option value="anthropic" />
+          <option value="python-telegram-bot" />
+          <option value="python-dotenv" />
+          <option value="httpx" />
+          <option value="pydantic" />
+        </list>
+      </option>
+    </inspection_tool>
+    <inspection_tool class="PyUnresolvedReferencesInspection" enabled="true" level="WARNING" enabled_by_default="true">
+      <option name="ignoredIdentifiers">
+        <list>
+          <option value="django.db.models.query.QuerySet.*" />
+        </list>
+      </option>
+    </inspection_tool>
+  </profile>
+</component>
