@@ -27,7 +27,11 @@ from app.schemas.auth import (
     ResetPasswordRequest,
     VerifyEmailRequest,
 )
-from app.services.email_service import send_password_reset_code, send_verification_code
+from app.services.email_service import (
+    send_hr_registration_admin_notification,
+    send_password_reset_code,
+    send_verification_code,
+)
 
 
 async def register_user(db: AsyncSession, payload: RegisterRequest) -> User:
@@ -46,6 +50,7 @@ async def register_user(db: AsyncSession, payload: RegisterRequest) -> User:
         role=payload.role,
         is_active=True,
         is_verified=False,
+        hr_approved=payload.role != UserRole.hr,
     )
     db.add(user)
     await db.flush()
@@ -53,6 +58,10 @@ async def register_user(db: AsyncSession, payload: RegisterRequest) -> User:
     await _create_and_send_verification_code(db, user)
     await db.commit()
     await db.refresh(user)
+
+    if user.role == UserRole.hr:
+        await _notify_admins_new_hr_registration(db, user)
+
     return user
 
 
@@ -266,6 +275,17 @@ async def reset_password(db: AsyncSession, payload: ResetPasswordRequest) -> Non
         .values(revoked_at=datetime.now(UTC))
     )
     await db.commit()
+
+
+async def _notify_admins_new_hr_registration(db: AsyncSession, hr_user: User) -> None:
+    admin_result = await db.execute(
+        select(User.email).where(User.role == UserRole.admin, User.is_active.is_(True))
+    )
+    admin_emails = list(admin_result.scalars().all())
+    if not admin_emails:
+        return
+    for admin_email in admin_emails:
+        await send_hr_registration_admin_notification(admin_email, hr_user.email, hr_user.id)
 
 
 async def _create_and_send_verification_code(db: AsyncSession, user: User) -> None:

@@ -50,6 +50,7 @@ class UserOut(BaseModel):
     role: UserRole
     is_active: bool
     is_verified: bool
+    hr_approved: bool
     created_at: datetime
 
     class Config:

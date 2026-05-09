@@ -39,3 +39,15 @@ def require_role(*roles: UserRole):
         return current_user
 
     return checker
+
+
+async def require_approved_hr(current_user: User = Depends(get_current_user)) -> User:
+    """Vakansiya kabi HR-only amallar: rol HR va admin tasdiqlashi bo‘lishi kerak."""
+    if current_user.role != UserRole.hr:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Faqat HR uchun.")
+    if not current_user.hr_approved:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="HR akkauntingiz admin tomonidan tasdiqlanmagan. Vakansiya joylash mumkin emas.",
+        )
+    return current_user

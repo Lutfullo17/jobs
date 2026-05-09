@@ -34,3 +34,14 @@ async def send_password_reset_code(email: str, code: str) -> None:
     subject = "Jobify - Password Reset Code"
     body = f"Sizning parol tiklash kodingiz: {code}\nKod 10 daqiqa amal qiladi."
     await send_email(email, subject, body)
+
+
+async def send_hr_registration_admin_notification(admin_email: str, hr_email: str, hr_user_id: int) -> None:
+    subject = "Jobify - Yangi HR ro‘yxatdan o‘tdi"
+    body = (
+        f"Yangi HR akkaunti yaratildi.\n\n"
+        f"HR email: {hr_email}\n"
+        f"Foydalanuvchi ID: {hr_user_id}\n\n"
+        f"Admin paneli orqali tasdiqlangandan keyin vakansiya joylash mumkin bo‘ladi."
+    )
+    await send_email(admin_email, subject, body)
