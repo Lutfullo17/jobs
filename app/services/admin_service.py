@@ -5,6 +5,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.user import User, UserRole
 
 
+
+
+
+
 async def list_pending_hr_users(db: AsyncSession) -> list[User]:
     result = await db.execute(
         select(User).where(

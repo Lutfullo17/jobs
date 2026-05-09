@@ -45,3 +45,8 @@ async def send_hr_registration_admin_notification(admin_email: str, hr_email: st
         f"Admin paneli orqali tasdiqlangandan keyin vakansiya joylash mumkin bo‘ladi."
     )
     await send_email(admin_email, subject, body)
+
+
+
+
+    
