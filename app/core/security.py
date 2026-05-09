@@ -3,14 +3,21 @@ import secrets
 from datetime import UTC, datetime, timedelta
 
 import jwt
+from fastapi import HTTPException, status
 from passlib.context import CryptContext
 
 from app.core.config import settings
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+MAX_BCRYPT_PASSWORD_LENGTH = 72
 
 
 def hash_password(password: str) -> str:
+    if len(password.encode("utf-8")) > MAX_BCRYPT_PASSWORD_LENGTH:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Password must be at most 72 bytes for bcrypt.",
+        )
     return pwd_context.hash(password)
 
 

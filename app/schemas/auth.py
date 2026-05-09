@@ -1,5 +1,5 @@
 from datetime import datetime
-from uuid import UUID
+
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -8,7 +8,7 @@ from app.models.user import UserRole
 
 class RegisterRequest(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=8)
+    password: str = Field(min_length=8, max_length=72)
     confirm_password: str
     role: UserRole
 
@@ -29,7 +29,7 @@ class RefreshRequest(BaseModel):
 
 class ChangePasswordRequest(BaseModel):
     old_password: str
-    new_password: str = Field(min_length=8)
+    new_password: str = Field(min_length=8, max_length=72)
     confirm_new_password: str
 
 
@@ -40,12 +40,12 @@ class ForgotPasswordRequest(BaseModel):
 class ResetPasswordRequest(BaseModel):
     email: EmailStr
     code: str = Field(min_length=6, max_length=6)
-    new_password: str = Field(min_length=8)
+    new_password: str = Field(min_length=8, max_length=72)
     confirm_new_password: str
 
 
 class UserOut(BaseModel):
-    id: UUID
+    id: int
     email: EmailStr
     role: UserRole
     is_active: bool

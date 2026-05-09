@@ -24,10 +24,14 @@ def upgrade() -> None:
 
     op.create_table(
         "users",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
+        sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True, nullable=False),
         sa.Column("email", sa.String(length=255), nullable=False),
         sa.Column("password_hash", sa.String(length=255), nullable=False),
-        sa.Column("role", sa.Enum("admin", "hr", "candidate", name="userrole"), nullable=False),
+        sa.Column(
+            "role",
+            postgresql.ENUM("admin", "hr", "candidate", name="userrole", create_type=False),
+            nullable=False,
+        ),
         sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("true")),
         sa.Column("is_verified", sa.Boolean(), nullable=False, server_default=sa.text("false")),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
@@ -37,8 +41,8 @@ def upgrade() -> None:
 
     op.create_table(
         "email_verification_codes",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
-        sa.Column("user_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+        sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True, nullable=False),
+        sa.Column("user_id", sa.Integer(), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
         sa.Column("code", sa.String(length=6), nullable=False),
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("is_used", sa.Boolean(), nullable=False, server_default=sa.text("false")),
@@ -47,8 +51,8 @@ def upgrade() -> None:
 
     op.create_table(
         "password_reset_codes",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
-        sa.Column("user_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+        sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True, nullable=False),
+        sa.Column("user_id", sa.Integer(), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
         sa.Column("code", sa.String(length=6), nullable=False),
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("is_used", sa.Boolean(), nullable=False, server_default=sa.text("false")),
@@ -57,8 +61,8 @@ def upgrade() -> None:
 
     op.create_table(
         "refresh_tokens",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
-        sa.Column("user_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+        sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True, nullable=False),
+        sa.Column("user_id", sa.Integer(), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
         sa.Column("token_hash", sa.String(length=255), nullable=False),
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("revoked_at", sa.DateTime(timezone=True), nullable=True),

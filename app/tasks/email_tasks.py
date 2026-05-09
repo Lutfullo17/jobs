@@ -5,7 +5,7 @@ from app.core.celery_app import celery_app
 from app.core.config import settings
 
 
-@celery_app.task(name="send_email_task")
+@celery_app.task(name="send_email_task", ignore_result=True)
 def send_email_task(to_email: str, subject: str, body: str) -> None:
     # SMTP login bo'lmasa local development uchun faqat print qilamiz.
     if not settings.smtp_user or not settings.smtp_password:

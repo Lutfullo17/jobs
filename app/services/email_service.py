@@ -1,9 +1,27 @@
+from socket import create_connection
+from urllib.parse import urlparse
+
+from app.core.config import settings
 from app.tasks.email_tasks import send_email_task
 
 
 async def send_email(to_email: str, subject: str, body: str) -> None:
     # HTTP request sekinlashmasligi uchun emailni Celery orqali yuboramiz.
-    send_email_task.delay(to_email, subject, body)
+    # Redis/Celery ishlamayotgan development holatida auth endpointlar yiqilmasligi uchun fail-open.
+    parsed = urlparse(settings.redis_url)
+    redis_host = parsed.hostname or "localhost"
+    redis_port = parsed.port or 6379
+    try:
+        with create_connection((redis_host, redis_port), timeout=0.3):
+            pass
+    except OSError:
+        print(f"[EMAIL-FALLBACK] To={to_email} | Subject={subject} | Body={body}")
+        return
+
+    try:
+        send_email_task.delay(to_email, subject, body)
+    except Exception:
+        print(f"[EMAIL-FALLBACK] To={to_email} | Subject={subject} | Body={body}")
 
 
 async def send_verification_code(email: str, code: str) -> None:

@@ -47,13 +47,13 @@ class ResendRequest(BaseModel):
 @router.post("/register/", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED)
 async def register(payload: RegisterRequest, db: AsyncSession = Depends(get_db)) -> RegisterResponse:
     user = await register_user(db, payload)
-    return RegisterResponse(user=UserOut.model_validate(user), message="Email verification code sent.")
+    return RegisterResponse(user=UserOut.model_validate(user), message="Elektron pochta tasdiqlash kodi yuborildi.")
 
 
 @router.post("/verify-email/", response_model=MessageResponse)
 async def verify_email_endpoint(payload: VerifyEmailRequest, db: AsyncSession = Depends(get_db)) -> MessageResponse:
     await verify_email(db, payload)
-    return MessageResponse(message="Email verified successfully.")
+    return MessageResponse(message="Elektron pochta muvaffaqiyatli tasdiqlandi.")
 
 
 @router.post("/resend-verification-code/", response_model=MessageResponse)
@@ -70,7 +70,7 @@ async def resend_verification_endpoint(
     if not allowed:
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many requests. Try again later.")
     await resend_verification_code(db, payload.email)
-    return MessageResponse(message="Verification code sent.")
+    return MessageResponse(message="Tasdiqlash kodi yuborildi.")
 
 
 @router.post("/login/", response_model=TokenResponse)
@@ -85,7 +85,7 @@ async def login(payload: LoginRequest, request: Request, db: AsyncSession = Depe
     if not allowed:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Too many login attempts. Try again later.",
+            detail="Ko'p login urinishlar. Qayta urinib ko'ring.",
         )
 
     access_token, refresh_token, user = await login_user(
@@ -110,7 +110,7 @@ async def refresh(payload: RefreshRequest, db: AsyncSession = Depends(get_db)) -
 @router.post("/logout/", response_model=MessageResponse)
 async def logout_endpoint(payload: RefreshRequest, db: AsyncSession = Depends(get_db)) -> MessageResponse:
     await logout(db, payload.refresh_token)
-    return MessageResponse(message="Logged out successfully.")
+    return MessageResponse(message="Chiqib ketildi.")
 
 
 @router.post("/logout-all/", response_model=MessageResponse)
@@ -119,7 +119,7 @@ async def logout_all_endpoint(
     current_user: User = Depends(get_current_user),
 ) -> MessageResponse:
     revoked_count = await logout_all_devices(db, current_user.id)
-    return MessageResponse(message=f"All devices logged out. Revoked tokens: {revoked_count}")
+    return MessageResponse(message=f"Barcha qurilmalar chiqib ketildi. Revoked tokens: {revoked_count}")
 
 
 @router.get("/me/", response_model=UserOut)
@@ -129,17 +129,17 @@ async def me(current_user: User = Depends(get_current_user)) -> UserOut:
 
 @router.get("/admin-only/", response_model=MessageResponse)
 async def admin_only(_: User = Depends(require_role(UserRole.admin))) -> MessageResponse:
-    return MessageResponse(message="Welcome Admin. You can access this endpoint.")
+    return MessageResponse(message="Xush kelibsiz Admin. Bu endpointga kirishingiz mumkin.")
 
 
 @router.get("/hr-only/", response_model=MessageResponse)
 async def hr_only(_: User = Depends(require_role(UserRole.hr))) -> MessageResponse:
-    return MessageResponse(message="Welcome HR. You can access this endpoint.")
+    return MessageResponse(message="Xush kelibsiz HR. Bu endpointga kirishingiz mumkin.")
 
 
 @router.get("/candidate-only/", response_model=MessageResponse)
 async def candidate_only(_: User = Depends(require_role(UserRole.candidate))) -> MessageResponse:
-    return MessageResponse(message="Welcome Candidate. You can access this endpoint.")
+    return MessageResponse(message="Xush kelibsiz Nomzod. Bu endpointga kirishingiz mumkin.")
 
 
 @router.post("/change-password/", response_model=MessageResponse)
@@ -149,7 +149,7 @@ async def change_password_endpoint(
     current_user: User = Depends(get_current_user),
 ) -> MessageResponse:
     await change_password(db, current_user, payload)
-    return MessageResponse(message="Password changed successfully.")
+    return MessageResponse(message="Parol muvaffaqiyatli o'zgartirildi.")
 
 
 @router.post("/forgot-password/", response_model=MessageResponse)
@@ -166,10 +166,10 @@ async def forgot_password_endpoint(
     if not allowed:
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many requests. Try again later.")
     await forgot_password(db, payload)
-    return MessageResponse(message="If this email exists, reset code has been sent.")
+    return MessageResponse(message="Agar bu elektron pochta mavjud bo'lsa, parol tiklash kodi yuborildi.")
 
 
 @router.post("/reset-password/", response_model=MessageResponse)
 async def reset_password_endpoint(payload: ResetPasswordRequest, db: AsyncSession = Depends(get_db)) -> MessageResponse:
     await reset_password(db, payload)
-    return MessageResponse(message="Password reset successfully.")
+    return MessageResponse(message="Parol muvaffaqiyatli tiklandi.")

@@ -32,13 +32,13 @@ from app.services.email_service import send_password_reset_code, send_verificati
 
 async def register_user(db: AsyncSession, payload: RegisterRequest) -> User:
     if payload.role == UserRole.admin:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin role cannot register here.")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Administrator roli bu yerda ro'yxatdan o'tolmaydi.")
     if payload.password != payload.confirm_password:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Passwords do not match.")
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Parol bir-biriga mos kelmayapti.")
 
     user_result = await db.execute(select(User).where(User.email == payload.email))
     if user_result.scalar_one_or_none():
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already exists.")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Elektron pochta allaqachon mavjud.")
 
     user = User(
         email=payload.email,
@@ -60,7 +60,7 @@ async def verify_email(db: AsyncSession, payload: VerifyEmailRequest) -> None:
     user_result = await db.execute(select(User).where(User.email == payload.email))
     user = user_result.scalar_one_or_none()
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Foydalanuvchi topilmadi.")
 
     code_result = await db.execute(
         select(EmailVerificationCode)
@@ -75,9 +75,9 @@ async def verify_email(db: AsyncSession, payload: VerifyEmailRequest) -> None:
     )
     code_obj = code_result.scalars().first()
     if not code_obj:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid verification code.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail= "Tasdiqlash kodi noto'g'ri.")
     if code_obj.expires_at < datetime.now(UTC):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Verification code expired.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tasdiqlash kodi muddati tugagan.")
 
     code_obj.is_used = True
     user.is_verified = True
@@ -88,9 +88,9 @@ async def resend_verification_code(db: AsyncSession, email: str) -> None:
     user_result = await db.execute(select(User).where(User.email == email))
     user = user_result.scalar_one_or_none()
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Foydalanuvchi topilmadi.")
     if user.is_verified:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User already verified.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Foydalanuvchi allaqachon tekshirilgan.")
 
     one_minute_ago = datetime.now(UTC) - timedelta(minutes=1)
     rate_result = await db.execute(
@@ -99,7 +99,7 @@ async def resend_verification_code(db: AsyncSession, email: str) -> None:
         .order_by(EmailVerificationCode.created_at.desc())
     )
     if rate_result.scalars().first():
-        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Try again in 1 minute.")
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="1 daqiqadan keyin yana urinib ko'ring.")
 
     await _create_and_send_verification_code(db, user)
     await db.commit()
@@ -114,11 +114,11 @@ async def login_user(
     user_result = await db.execute(select(User).where(User.email == payload.email))
     user = user_result.scalar_one_or_none()
     if not user or not verify_password(payload.password, user.password_hash):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials.")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Noto'g'ri ma'lumotlar.")
     if not user.is_active:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Inactive user.")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Faol bo'lmagan foydalanuvchi.")
     if not user.is_verified:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Email is not verified.")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Elektron pochta tasdiqlanmagan.")
 
     access_token = create_access_token(str(user.id), user.email, user.role.value)
     jti = str(uuid4())
@@ -146,12 +146,12 @@ async def refresh_access_token(db: AsyncSession, refresh_token: str) -> tuple[st
     user_result = await db.execute(select(User).where(User.id == user_id))
     user = user_result.scalar_one_or_none()
     if not user or not user.is_active:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token user.")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Yangilash token foydalanuvchisi noto'g'ri.")
 
     token_result = await db.execute(select(RefreshToken).where(RefreshToken.token_hash == hash_token(refresh_token)))
     token_obj = token_result.scalar_one_or_none()
     if not token_obj or token_obj.revoked_at is not None or token_obj.expires_at < datetime.now(UTC):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token expired or revoked.")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Yangilash tokenining muddati tugagan yoki bekor qilingan.")
 
     token_obj.revoked_at = datetime.now(UTC)
 
@@ -181,7 +181,7 @@ async def logout(db: AsyncSession, refresh_token: str) -> None:
         await db.commit()
 
 
-async def logout_all_devices(db: AsyncSession, user_id: str) -> int:
+async def logout_all_devices(db: AsyncSession, user_id: int) -> int:
     result = await db.execute(
         update(RefreshToken)
         .where(and_(RefreshToken.user_id == user_id, RefreshToken.revoked_at.is_(None)))
@@ -193,11 +193,11 @@ async def logout_all_devices(db: AsyncSession, user_id: str) -> int:
 
 async def change_password(db: AsyncSession, current_user: User, payload: ChangePasswordRequest) -> None:
     if not verify_password(payload.old_password, current_user.password_hash):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Old password is incorrect.")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Eski parol noto'g'ri.")
     if payload.new_password != payload.confirm_new_password:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Passwords do not match.")
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Parol bir-biriga mos kelmayapti.")
     if verify_password(payload.new_password, current_user.password_hash):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="New password cannot be old password.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Yangi parol eski paroldan foydalanilishi mumkin emas.")
 
     current_user.password_hash = hash_password(payload.new_password)
     await db.execute(
@@ -234,12 +234,12 @@ async def forgot_password(db: AsyncSession, payload: ForgotPasswordRequest) -> N
 
 async def reset_password(db: AsyncSession, payload: ResetPasswordRequest) -> None:
     if payload.new_password != payload.confirm_new_password:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Passwords do not match.")
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Parol bir-biriga mos kelmayapti.")
 
     user_result = await db.execute(select(User).where(User.email == payload.email))
     user = user_result.scalar_one_or_none()
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Foydalanuvchi topilmadi.")
 
     code_result = await db.execute(
         select(PasswordResetCode)
@@ -254,9 +254,9 @@ async def reset_password(db: AsyncSession, payload: ResetPasswordRequest) -> Non
     )
     code_obj = code_result.scalars().first()
     if not code_obj:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid reset code.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Parol tiklash kodi noto'g'ri.")
     if code_obj.expires_at < datetime.now(UTC):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Reset code expired.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Parol tiklash kodi muddati tugagan.")
 
     user.password_hash = hash_password(payload.new_password)
     code_obj.is_used = True
@@ -290,8 +290,8 @@ def _decode_refresh_token(refresh_token: str) -> dict:
     try:
         payload = decode_token(refresh_token)
     except Exception as exc:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token.") from exc
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Yangilash tokenining noto'g'ri.") from exc
 
     if payload.get("token_type") != "refresh":
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token type.")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token turi noto'g'ri.")
     return payload
