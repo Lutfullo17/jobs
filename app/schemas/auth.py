@@ -58,6 +58,10 @@ class UserOut(BaseModel):
 
 
 class RegisterResponse(BaseModel):
+    message: str
+
+
+class VerifyEmailResponse(BaseModel):
     user: UserOut
     message: str
 

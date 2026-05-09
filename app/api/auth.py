@@ -2,11 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user, require_role
+from app.api.deps import get_current_user
 from app.core.database import get_db
 from app.core.redis_client import enforce_rate_limit
 from app.core.config import settings
-from app.models.user import User, UserRole
+from app.models.user import User
 from app.schemas.auth import (
     AccessTokenResponse,
     ChangePasswordRequest,
@@ -19,6 +19,7 @@ from app.schemas.auth import (
     TokenResponse,
     UserOut,
     VerifyEmailRequest,
+    VerifyEmailResponse,
 )
 from app.services.auth_service import (
     change_password,
@@ -46,14 +47,17 @@ class ResendRequest(BaseModel):
 
 @router.post("/register/", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED)
 async def register(payload: RegisterRequest, db: AsyncSession = Depends(get_db)) -> RegisterResponse:
-    user = await register_user(db, payload)
-    return RegisterResponse(user=UserOut.model_validate(user), message="Elektron pochta tasdiqlash kodi yuborildi.")
+    await register_user(db, payload)
+    return RegisterResponse(message="Elektron pochta tasdiqlash kodi yuborildi.")
 
 
-@router.post("/verify-email/", response_model=MessageResponse)
-async def verify_email_endpoint(payload: VerifyEmailRequest, db: AsyncSession = Depends(get_db)) -> MessageResponse:
-    await verify_email(db, payload)
-    return MessageResponse(message="Elektron pochta muvaffaqiyatli tasdiqlandi.")
+@router.post("/verify-email/", response_model=VerifyEmailResponse)
+async def verify_email_endpoint(payload: VerifyEmailRequest, db: AsyncSession = Depends(get_db)) -> VerifyEmailResponse:
+    user = await verify_email(db, payload)
+    return VerifyEmailResponse(
+        user=UserOut.model_validate(user),
+        message="Elektron pochta muvaffaqiyatli tasdiqlandi.",
+    )
 
 
 @router.post("/resend-verification-code/", response_model=MessageResponse)
@@ -127,21 +131,6 @@ async def me(current_user: User = Depends(get_current_user)) -> UserOut:
     return UserOut.model_validate(current_user)
 
 
-@router.get("/admin-only/", response_model=MessageResponse)
-async def admin_only(_: User = Depends(require_role(UserRole.admin))) -> MessageResponse:
-    return MessageResponse(message="Xush kelibsiz Admin. Bu endpointga kirishingiz mumkin.")
-
-
-@router.get("/hr-only/", response_model=MessageResponse)
-async def hr_only(_: User = Depends(require_role(UserRole.hr))) -> MessageResponse:
-    return MessageResponse(message="Xush kelibsiz HR. Bu endpointga kirishingiz mumkin.")
-
-
-@router.get("/candidate-only/", response_model=MessageResponse)
-async def candidate_only(_: User = Depends(require_role(UserRole.candidate))) -> MessageResponse:
-    return MessageResponse(message="Xush kelibsiz Nomzod. Bu endpointga kirishingiz mumkin.")
-
-
 @router.post("/change-password/", response_model=MessageResponse)
 async def change_password_endpoint(
     payload: ChangePasswordRequest,
@@ -166,7 +155,7 @@ async def forgot_password_endpoint(
     if not allowed:
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many requests. Try again later.")
     await forgot_password(db, payload)
-    return MessageResponse(message="Agar bu elektron pochta mavjud bo'lsa, parol tiklash kodi yuborildi.")
+    return MessageResponse(message="Parol tiklash kodi yuborildi.")
 
 
 @router.post("/reset-password/", response_model=MessageResponse)

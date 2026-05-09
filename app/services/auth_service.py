@@ -48,7 +48,7 @@ async def register_user(db: AsyncSession, payload: RegisterRequest) -> User:
         email=payload.email,
         password_hash=hash_password(payload.password),
         role=payload.role,
-        is_active=True,
+        is_active=False,
         is_verified=False,
         hr_approved=payload.role != UserRole.hr,
     )
@@ -65,7 +65,7 @@ async def register_user(db: AsyncSession, payload: RegisterRequest) -> User:
     return user
 
 
-async def verify_email(db: AsyncSession, payload: VerifyEmailRequest) -> None:
+async def verify_email(db: AsyncSession, payload: VerifyEmailRequest) -> User:
     user_result = await db.execute(select(User).where(User.email == payload.email))
     user = user_result.scalar_one_or_none()
     if not user:
@@ -84,13 +84,16 @@ async def verify_email(db: AsyncSession, payload: VerifyEmailRequest) -> None:
     )
     code_obj = code_result.scalars().first()
     if not code_obj:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail= "Tasdiqlash kodi noto'g'ri.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tasdiqlash kodi noto'g'ri.")
     if code_obj.expires_at < datetime.now(UTC):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tasdiqlash kodi muddati tugagan.")
 
     code_obj.is_used = True
     user.is_verified = True
+    user.is_active = True
     await db.commit()
+    await db.refresh(user)
+    return user
 
 
 async def resend_verification_code(db: AsyncSession, email: str) -> None:
@@ -124,10 +127,10 @@ async def login_user(
     user = user_result.scalar_one_or_none()
     if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Noto'g'ri ma'lumotlar.")
-    if not user.is_active:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Faol bo'lmagan foydalanuvchi.")
     if not user.is_verified:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Elektron pochta tasdiqlanmagan.")
+    if not user.is_active:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Faol bo'lmagan foydalanuvchi.")
 
     access_token = create_access_token(str(user.id), user.email, user.role.value)
     jti = str(uuid4())
@@ -150,7 +153,13 @@ async def login_user(
 
 async def refresh_access_token(db: AsyncSession, refresh_token: str) -> tuple[str, str]:
     payload = _decode_refresh_token(refresh_token)
-    user_id = payload["user_id"]
+    try:
+        user_id = int(payload["user_id"])
+    except (TypeError, ValueError, KeyError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Yangilash token foydalanuvchi identifikatori noto'g'ri.",
+        ) from exc
 
     user_result = await db.execute(select(User).where(User.id == user_id))
     user = user_result.scalar_one_or_none()
@@ -221,7 +230,10 @@ async def forgot_password(db: AsyncSession, payload: ForgotPasswordRequest) -> N
     user_result = await db.execute(select(User).where(User.email == payload.email))
     user = user_result.scalar_one_or_none()
     if not user:
-        return
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Bu email ro'yxatdan o'tmagan. Iltimos, ro'yxatdan o'ting.",
+        )
 
     await db.execute(
         update(PasswordResetCode).where(

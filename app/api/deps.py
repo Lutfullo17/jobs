@@ -18,24 +18,30 @@ async def get_current_user(
     try:
         payload = decode_token(token)
     except Exception as exc:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid access token.") from exc
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Kirish tokeni noto'g'ri.") from exc
 
     if payload.get("token_type") != "access":
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token type.")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token turi noto'g'ri.")
 
-    result = await db.execute(select(User).where(User.id == payload.get("user_id")))
+    raw_user_id = payload.get("user_id")
+    try:
+        user_id = int(raw_user_id)
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Kirish tokenining yuklamasi noto'g'ri. Sizning ID-siz yo'q.") from exc
+
+    result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Foydalanuvchi topilmadi.")
     if not user.is_active:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Inactive user.")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Faol bo'lmagan foydalanuvchi.")
     return user
 
 
 def require_role(*roles: UserRole):
     async def checker(current_user: User = Depends(get_current_user)) -> User:
         if current_user.role not in roles:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied.")
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Ruxsat berilmagan.")
         return current_user
 
     return checker
