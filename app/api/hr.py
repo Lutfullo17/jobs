@@ -1,0 +1,175 @@
+"""
+HR uchun API.
+
+- `/status` — barcha HR (tasdiqlanmagan ham) ko'ra oladi.
+- Qolganlari — faqat admin HR ni tasdiqlagach (`require_approved_hr`).
+"""
+
+from fastapi import APIRouter, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.api.deps import get_db, require_approved_hr, require_hr_user
+from app.models.user import User
+from app.schemas.hr_vacancy import (
+    ApplicationDetailOut,
+    ApplicationHrListOut,
+    ChatMessageOut,
+    HrStatusResponse,
+    RecruitmentActionResponse,
+    RecruitmentChatBody,
+    RecruitmentChatResponse,
+    VacancyCreateBody,
+    VacancyDeletedResponse,
+    VacancyHrItem,
+)
+from app.services.vacancy_application_service import (
+    accept_application,
+    append_chat_message,
+    get_application_for_hr,
+    create_vacancy,
+    list_hr_applications,
+    list_hr_vacancies,
+    get_hr_vacancy,
+    reject_application,
+    soft_delete_vacancy,
+)
+
+router = APIRouter(prefix="/api/hr", tags=["HR"])
+
+
+@router.get("/status/", response_model=HrStatusResponse)
+async def hr_status(current: User = Depends(require_hr_user)) -> HrStatusResponse:
+    return HrStatusResponse(
+        hr_approved=current.hr_approved,
+        can_post_vacancies=current.hr_approved,
+    )
+
+
+# ----- vakansiyalar -----
+
+
+@router.post("/vacancies/", response_model=VacancyHrItem, status_code=201)
+async def post_vacancy(
+    payload: VacancyCreateBody,
+    db: AsyncSession = Depends(get_db),
+    hr: User = Depends(require_approved_hr),
+) -> VacancyHrItem:
+    v = await create_vacancy(db, hr_id=hr.id, payload=payload)
+    return VacancyHrItem.model_validate(v)
+
+
+@router.get("/vacancies/", response_model=list[VacancyHrItem])
+async def get_my_vacancies(
+    db: AsyncSession = Depends(get_db),
+    hr: User = Depends(require_approved_hr),
+) -> list[VacancyHrItem]:
+    rows = await list_hr_vacancies(db, hr.id)
+    return [VacancyHrItem.model_validate(x) for x in rows]
+
+
+@router.get("/vacancies/{vacancy_id}/", response_model=VacancyHrItem)
+async def get_one_vacancy(
+    vacancy_id: int,
+    db: AsyncSession = Depends(get_db),
+    hr: User = Depends(require_approved_hr),
+) -> VacancyHrItem:
+    v = await get_hr_vacancy(db, vacancy_id, hr.id)
+    return VacancyHrItem.model_validate(v)
+
+
+@router.delete("/vacancies/{vacancy_id}/", response_model=VacancyDeletedResponse)
+async def delete_vacancy_endpoint(
+    vacancy_id: int,
+    db: AsyncSession = Depends(get_db),
+    hr: User = Depends(require_approved_hr),
+) -> VacancyDeletedResponse:
+    await soft_delete_vacancy(db, vacancy_id, hr.id)
+    return VacancyDeletedResponse(message="Vakansiya o'chirildi (yashirin).")
+
+
+# ----- murojaatlar (nomzodlar yozishmasi) -----
+
+
+def _detail_out(app_row) -> ApplicationDetailOut:
+    msgs = sorted(app_row.chat_messages, key=lambda m: m.created_at)
+    vac = app_row.vacancy
+    cand = app_row.candidate
+    return ApplicationDetailOut(
+        id=app_row.id,
+        vacancy_id=app_row.vacancy_id,
+        vacancy_title=vac.title if vac else "",
+        candidate_id=app_row.candidate_id,
+        candidate_email=cand.email,
+        status=app_row.status,
+        initial_message=app_row.initial_message,
+        created_at=app_row.created_at,
+        chat_messages=[ChatMessageOut.model_validate(m) for m in msgs],
+    )
+
+
+@router.get("/applications/", response_model=list[ApplicationHrListOut])
+async def list_applications_for_my_vacancies(
+    db: AsyncSession = Depends(get_db),
+    hr: User = Depends(require_approved_hr),
+) -> list[ApplicationHrListOut]:
+    rows = await list_hr_applications(db, hr.id)
+    out: list[ApplicationHrListOut] = []
+    for a in rows:
+        out.append(
+            ApplicationHrListOut(
+                id=a.id,
+                vacancy_id=a.vacancy_id,
+                vacancy_title=a.vacancy.title if a.vacancy else "",
+                candidate_id=a.candidate_id,
+                candidate_email=a.candidate.email,
+                status=a.status,
+                initial_message=a.initial_message,
+                created_at=a.created_at,
+            )
+        )
+    return out
+
+
+@router.get("/applications/{application_id}/", response_model=ApplicationDetailOut)
+async def hr_application_detail(
+    application_id: int,
+    db: AsyncSession = Depends(get_db),
+    hr: User = Depends(require_approved_hr),
+) -> ApplicationDetailOut:
+    a = await get_application_for_hr(db, application_id, hr.id)
+    return _detail_out(a)
+
+
+@router.post("/applications/{application_id}/accept/", response_model=RecruitmentActionResponse)
+async def accept_candidate_chat(
+    application_id: int,
+    db: AsyncSession = Depends(get_db),
+    hr: User = Depends(require_approved_hr),
+) -> RecruitmentActionResponse:
+    a = await accept_application(db, application_id=application_id, hr=hr)
+    return RecruitmentActionResponse(
+        application_id=a.id,
+        status=a.status,
+        message="Nomzod bilan qo'shimcha yozishish ochildi.",
+    )
+
+
+@router.post("/applications/{application_id}/reject/", response_model=RecruitmentActionResponse)
+async def reject_candidate(
+    application_id: int,
+    db: AsyncSession = Depends(get_db),
+    hr: User = Depends(require_approved_hr),
+) -> RecruitmentActionResponse:
+    a = await reject_application(db, application_id=application_id, hr=hr)
+    return RecruitmentActionResponse(application_id=a.id, status=a.status, message="Murojaat rad etildi.")
+
+
+@router.post("/applications/{application_id}/messages/", response_model=RecruitmentChatResponse)
+async def hr_send_chat_message(
+    application_id: int,
+    payload: RecruitmentChatBody,
+    db: AsyncSession = Depends(get_db),
+    hr: User = Depends(require_approved_hr),
+) -> RecruitmentChatResponse:
+    await append_chat_message(db, application_id=application_id, sender=hr, body=payload.message)
+    return RecruitmentChatResponse(message="Xabar yuborildi.")

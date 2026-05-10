@@ -15,6 +15,7 @@ from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+from app.models.user import User
 
 
 class SupportThreadStatus(str, enum.Enum):
@@ -39,6 +40,7 @@ class SupportThread(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
+    creator: Mapped[User] = relationship(foreign_keys=[created_by_id])
     messages: Mapped[list["SupportMessage"]] = relationship("SupportMessage", back_populates="thread")
 
 

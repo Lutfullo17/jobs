@@ -47,6 +47,19 @@ def require_role(*roles: UserRole):
     return checker
 
 
+async def require_hr_user(current_user: User = Depends(get_current_user)) -> User:
+    """Faqat HR (tasdiqlangan yoki yo'q — masalan `/api/hr/status`)."""
+    if current_user.role != UserRole.hr:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Faqat HR uchun.")
+    return current_user
+
+
+async def require_candidate(current_user: User = Depends(get_current_user)) -> User:
+    if current_user.role != UserRole.candidate:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Faqat nomzod uchun.")
+    return current_user
+
+
 async def require_hr_or_candidate(current_user: User = Depends(get_current_user)) -> User:
     """Admin bilan yozishmalar: faqat HR yoki nomzod (admin alohida endpoint orqali javob beradi)."""
     if current_user.role not in (UserRole.hr, UserRole.candidate):

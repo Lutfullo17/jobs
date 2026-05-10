@@ -45,7 +45,11 @@ async def list_all_threads_admin(
     *,
     status_filter: SupportThreadStatus | None = None,
 ) -> list[SupportThread]:
-    q = select(SupportThread).order_by(SupportThread.updated_at.desc())
+    q = (
+        select(SupportThread)
+        .options(selectinload(SupportThread.creator))
+        .order_by(SupportThread.updated_at.desc())
+    )
     if status_filter is not None:
         q = q.where(SupportThread.status == status_filter)
     result = await db.execute(q)
@@ -63,7 +67,7 @@ async def get_thread_with_messages(
     """
     result = await db.execute(
         select(SupportThread)
-        .options(selectinload(SupportThread.messages))
+        .options(selectinload(SupportThread.messages), selectinload(SupportThread.creator))
         .where(SupportThread.id == thread_id)
     )
     thread = result.scalar_one_or_none()
@@ -117,6 +121,19 @@ async def add_admin_reply(
     await db.commit()
     await db.refresh(msg)
     return msg
+
+
+async def reload_support_thread_with_creator(db: AsyncSession, thread_id: int) -> SupportThread:
+    """Yopilgan/yangilangan threadni admin javobi uchun creator bilan qayta yuklash."""
+    q = await db.execute(
+        select(SupportThread)
+        .options(selectinload(SupportThread.creator))
+        .where(SupportThread.id == thread_id)
+    )
+    thread = q.scalar_one_or_none()
+    if not thread:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mavzu topilmadi.")
+    return thread
 
 
 async def close_thread_admin(db: AsyncSession, *, thread_id: int, admin: User) -> SupportThread:

@@ -2,9 +2,10 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
 
 from app.models.support import SupportThreadStatus
+from app.models.user import UserRole
 
 
 class SupportMessageOut(BaseModel):
@@ -37,11 +38,26 @@ class SupportThreadListItem(BaseModel):
         from_attributes = True
 
 
+class SupportThreadAdminListItem(BaseModel):
+    """Admin ro'yxati: kim yozganini (HR / candidate) darhol bilish uchun."""
+
+    id: int
+    subject: str
+    status: SupportThreadStatus
+    created_by_id: int
+    creator_role: UserRole
+    creator_email: EmailStr
+    created_at: datetime
+    updated_at: datetime
+
+
 class SupportThreadDetail(BaseModel):
     id: int
     subject: str
     status: SupportThreadStatus
     created_by_id: int
+    creator_role: UserRole
+    creator_email: EmailStr
     created_at: datetime
     updated_at: datetime
     messages: list[SupportMessageOut]

@@ -68,6 +68,8 @@ async def thread_detail(
         subject=t.subject,
         status=t.status,
         created_by_id=t.created_by_id,
+        creator_role=current.role,
+        creator_email=current.email,
         created_at=t.created_at,
         updated_at=t.updated_at,
         messages=[SupportMessageOut.model_validate(m) for m in msgs],
