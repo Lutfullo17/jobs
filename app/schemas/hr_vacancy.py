@@ -141,6 +141,7 @@ class ApplicationHrListOut(BaseModel):
     status: ApplicationStatus
     initial_message: str
     created_at: datetime
+    resume_download_url: str | None = None
 
 
 class ApplicationDetailOut(BaseModel):
@@ -152,6 +153,7 @@ class ApplicationDetailOut(BaseModel):
     status: ApplicationStatus
     initial_message: str
     created_at: datetime
+    resume_download_url: str | None = None
     chat_messages: list[ChatMessageOut]
 
 

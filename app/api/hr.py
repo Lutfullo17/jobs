@@ -5,11 +5,15 @@ HR uchun API.
 - Qolganlari — faqat admin HR ni tasdiqlagach (`require_approved_hr`).
 """
 
-from fastapi import APIRouter, Depends
+from pathlib import Path
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db, require_approved_hr, require_hr_user
 from app.models.user import User
+from app.models.vacancy import ApplicationStatus
 from app.schemas.hr_vacancy import (
     ApplicationDetailOut,
     ApplicationHrListOut,
@@ -27,12 +31,13 @@ from app.services.vacancy_application_service import (
     append_chat_message,
     get_application_for_hr,
     create_vacancy,
-    list_hr_applications,
+    list_hr_applications_filtered,
     list_hr_vacancies,
     get_hr_vacancy,
     reject_application,
     soft_delete_vacancy,
 )
+from app.services.resume_service import get_candidate_resume
 
 router = APIRouter(prefix="/api/hr", tags=["HR"])
 
@@ -90,7 +95,7 @@ async def delete_vacancy_endpoint(
 # ----- murojaatlar (nomzodlar yozishmasi) -----
 
 
-def _detail_out(app_row) -> ApplicationDetailOut:
+def _detail_out(app_row, *, resume_download_url: str | None = None) -> ApplicationDetailOut:
     msgs = sorted(app_row.chat_messages, key=lambda m: m.created_at)
     vac = app_row.vacancy
     cand = app_row.candidate
@@ -103,18 +108,27 @@ def _detail_out(app_row) -> ApplicationDetailOut:
         status=app_row.status,
         initial_message=app_row.initial_message,
         created_at=app_row.created_at,
+        resume_download_url=resume_download_url,
         chat_messages=[ChatMessageOut.model_validate(m) for m in msgs],
     )
 
 
 @router.get("/applications/", response_model=list[ApplicationHrListOut])
 async def list_applications_for_my_vacancies(
+    request: Request,
     db: AsyncSession = Depends(get_db),
     hr: User = Depends(require_approved_hr),
+    status: ApplicationStatus | None = Query(None),
+    vacancy_id: int | None = Query(None, ge=1),
+    q: str | None = Query(None, description="Vacancy title/company/location yoki initial_message bo'yicha qidirish"),
 ) -> list[ApplicationHrListOut]:
-    rows = await list_hr_applications(db, hr.id)
+    rows = await list_hr_applications_filtered(db, hr_id=hr.id, status=status, vacancy_id=vacancy_id, q=q)
     out: list[ApplicationHrListOut] = []
     for a in rows:
+        resume = await get_candidate_resume(db, candidate_id=a.candidate_id)
+        resume_url = None
+        if resume:
+            resume_url = str(request.url_for("hr_download_candidate_resume", application_id=a.id))
         out.append(
             ApplicationHrListOut(
                 id=a.id,
@@ -125,6 +139,7 @@ async def list_applications_for_my_vacancies(
                 status=a.status,
                 initial_message=a.initial_message,
                 created_at=a.created_at,
+                resume_download_url=resume_url,
             )
         )
     return out
@@ -133,11 +148,30 @@ async def list_applications_for_my_vacancies(
 @router.get("/applications/{application_id}/", response_model=ApplicationDetailOut)
 async def hr_application_detail(
     application_id: int,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     hr: User = Depends(require_approved_hr),
 ) -> ApplicationDetailOut:
     a = await get_application_for_hr(db, application_id, hr.id)
-    return _detail_out(a)
+    resume = await get_candidate_resume(db, candidate_id=a.candidate_id)
+    resume_url = str(request.url_for("hr_download_candidate_resume", application_id=a.id)) if resume else None
+    return _detail_out(a, resume_download_url=resume_url)
+
+
+@router.get("/applications/{application_id}/resume/", name="hr_download_candidate_resume")
+async def download_candidate_resume_for_hr(
+    application_id: int,
+    db: AsyncSession = Depends(get_db),
+    hr: User = Depends(require_approved_hr),
+):
+    app_row = await get_application_for_hr(db, application_id, hr.id)
+    resume = await get_candidate_resume(db, candidate_id=app_row.candidate_id)
+    if not resume:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Nomzod rezumesi topilmadi.")
+    file_path = Path(resume.file_path)
+    if not file_path.exists():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rezume fayli topilmadi.")
+    return FileResponse(path=str(file_path), media_type=resume.content_type, filename=resume.original_filename)
 
 
 @router.post("/applications/{application_id}/accept/", response_model=RecruitmentActionResponse)

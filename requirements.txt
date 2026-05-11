@@ -13,3 +13,4 @@ email-validator
 redis
 aiosmtplib
 celery
+python-multipart

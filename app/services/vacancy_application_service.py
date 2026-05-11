@@ -11,7 +11,7 @@ Technik tekshiruvlar: vacancy o'chirilgan bo'lsa/yoki HR boshqasining vakansi bo
 
 from datetime import UTC, datetime
 
-from sqlalchemy import Select, or_, select
+from sqlalchemy import Select, and_, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -19,16 +19,28 @@ from sqlalchemy.orm import selectinload
 from fastapi import HTTPException, status
 
 from app.models.user import User, UserRole
-from app.models.vacancy import ApplicationMessage, ApplicationStatus, Vacancy, VacancyApplication
+from app.models.vacancy import ApplicationMessage, ApplicationStatus, EmploymentType, Vacancy, VacancyApplication, WorkMode
 from app.schemas.hr_vacancy import VacancyCreateBody
 
 
 # ----- umumiy (ochiq ro'yxat) -----
 
 
-async def list_active_vacancies(db: AsyncSession) -> list[Vacancy]:
+async def list_active_vacancies(
+    db: AsyncSession,
+    *,
+    q: str | None = None,
+    location: str | None = None,
+    company_name: str | None = None,
+    employment_type: EmploymentType | None = None,
+    work_mode: WorkMode | None = None,
+    salary_from: int | None = None,
+    salary_to: int | None = None,
+    salary_currency: str | None = None,
+    salary_negotiable: bool | None = None,
+) -> list[Vacancy]:
     today = datetime.now(UTC).date()
-    q = await db.execute(
+    stmt = (
         select(Vacancy)
         .where(
             Vacancy.is_deleted.is_(False),
@@ -36,7 +48,34 @@ async def list_active_vacancies(db: AsyncSession) -> list[Vacancy]:
         )
         .order_by(Vacancy.created_at.desc())
     )
-    return list(q.scalars().all())
+
+    if q:
+        like = f"%{q.strip()}%"
+        stmt = stmt.where(or_(Vacancy.title.ilike(like), Vacancy.description.ilike(like)))
+    if location:
+        stmt = stmt.where(Vacancy.location.ilike(f"%{location.strip()}%"))
+    if company_name:
+        stmt = stmt.where(Vacancy.company_name.ilike(f"%{company_name.strip()}%"))
+    if employment_type is not None:
+        stmt = stmt.where(Vacancy.employment_type == employment_type)
+    if work_mode is not None:
+        stmt = stmt.where(Vacancy.work_mode == work_mode)
+    if salary_currency:
+        stmt = stmt.where(Vacancy.salary_currency == salary_currency.strip())
+    if salary_negotiable is not None:
+        stmt = stmt.where(Vacancy.salary_negotiable.is_(salary_negotiable))
+
+    # salary range filter (nullable ustunlar bilan ehtiyotkor)
+    salary_clauses = []
+    if salary_from is not None:
+        salary_clauses.append(or_(Vacancy.salary_to.is_(None), Vacancy.salary_to >= salary_from))
+    if salary_to is not None:
+        salary_clauses.append(or_(Vacancy.salary_from.is_(None), Vacancy.salary_from <= salary_to))
+    if salary_clauses:
+        stmt = stmt.where(and_(*salary_clauses))
+
+    res = await db.execute(stmt)
+    return list(res.scalars().all())
 
 
 async def get_active_vacancy(db: AsyncSession, vacancy_id: int) -> Vacancy | None:
@@ -157,6 +196,43 @@ async def list_candidate_applications(db: AsyncSession, candidate_id: int) -> li
     return list(q.scalars().all())
 
 
+async def list_candidate_applications_filtered(
+    db: AsyncSession,
+    *,
+    candidate_id: int,
+    status: ApplicationStatus | None = None,
+    vacancy_id: int | None = None,
+    q: str | None = None,
+) -> list[VacancyApplication]:
+    stmt = (
+        select(VacancyApplication)
+        .join(Vacancy, Vacancy.id == VacancyApplication.vacancy_id)
+        .options(
+            selectinload(VacancyApplication.vacancy),
+            selectinload(VacancyApplication.candidate),
+            selectinload(VacancyApplication.chat_messages),
+        )
+        .where(VacancyApplication.candidate_id == candidate_id)
+        .order_by(VacancyApplication.created_at.desc())
+    )
+    if status is not None:
+        stmt = stmt.where(VacancyApplication.status == status)
+    if vacancy_id is not None:
+        stmt = stmt.where(VacancyApplication.vacancy_id == vacancy_id)
+    if q:
+        like = f"%{q.strip()}%"
+        stmt = stmt.where(
+            or_(
+                Vacancy.title.ilike(like),
+                Vacancy.company_name.ilike(like),
+                Vacancy.location.ilike(like),
+                VacancyApplication.initial_message.ilike(like),
+            )
+        )
+    res = await db.execute(stmt)
+    return list(res.scalars().all())
+
+
 # ----- HR: murojaatlar -----
 
 
@@ -173,6 +249,33 @@ def _applications_for_hr_query(hr_id: int) -> Select:
 async def list_hr_applications(db: AsyncSession, hr_id: int) -> list[VacancyApplication]:
     q = await db.execute(_applications_for_hr_query(hr_id))
     return list(q.scalars().all())
+
+
+async def list_hr_applications_filtered(
+    db: AsyncSession,
+    *,
+    hr_id: int,
+    status: ApplicationStatus | None = None,
+    vacancy_id: int | None = None,
+    q: str | None = None,
+) -> list[VacancyApplication]:
+    stmt = _applications_for_hr_query(hr_id)
+    if status is not None:
+        stmt = stmt.where(VacancyApplication.status == status)
+    if vacancy_id is not None:
+        stmt = stmt.where(VacancyApplication.vacancy_id == vacancy_id)
+    if q:
+        like = f"%{q.strip()}%"
+        stmt = stmt.where(
+            or_(
+                Vacancy.title.ilike(like),
+                Vacancy.company_name.ilike(like),
+                Vacancy.location.ilike(like),
+                VacancyApplication.initial_message.ilike(like),
+            )
+        )
+    res = await db.execute(stmt)
+    return list(res.scalars().all())
 
 
 async def get_application_for_hr(db: AsyncSession, application_id: int, hr_id: int) -> VacancyApplication:
