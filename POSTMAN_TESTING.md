@@ -44,6 +44,28 @@ Masalan:
 [EMAIL-DEV][CELERY] To=candidate@example.com | Subject=... | Body=Sizning tasdiqlash kodingiz: 123456
 ```
 
+Gmailga kod kelishi uchun `.env` ichida shunday yozing:
+
+```text
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your_email@gmail.com
+SMTP_PASSWORD=your_gmail_app_password
+EMAIL_FROM=your_email@gmail.com
+SMTP_USE_TLS=false
+SMTP_USE_STARTTLS=true
+EMAIL_DELIVERY_MODE=direct
+```
+
+Eslatma:
+
+```text
+SMTP_PASSWORD joyiga oddiy Gmail parol emas, Gmail App Password yoziladi.
+Gmail App Password olish uchun Google Account → Security → 2-Step Verification → App passwords.
+Agar EMAIL_DELIVERY_MODE=celery bo'lsa, Redis bilan birga celery-worker ham ishlab turishi kerak.
+Faqat uvicorn bilan ishlatsangiz EMAIL_DELIVERY_MODE=direct qiling.
+```
+
 ---
 
 # 1. Auth API

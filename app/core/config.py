@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import EmailStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -22,6 +24,7 @@ class Settings(BaseSettings):
     email_from: EmailStr = "noreply@example.com"
     smtp_use_tls: bool = False
     smtp_use_starttls: bool = True
+    email_delivery_mode: Literal["celery", "direct"] = "celery"
 
     redis_url: str = "redis://localhost:6379/0"
     verification_code_expire_minutes: int = 10

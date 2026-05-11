@@ -1,13 +1,18 @@
+import asyncio
 from socket import create_connection
 from urllib.parse import urlparse
 
 from app.core.config import settings
-from app.tasks.email_tasks import send_email_task
+from app.tasks.email_tasks import send_email_now, send_email_task
 
 
 async def send_email(to_email: str, subject: str, body: str) -> None:
+    if settings.email_delivery_mode == "direct":
+        await asyncio.to_thread(send_email_now, to_email, subject, body)
+        return
+
     # HTTP request sekinlashmasligi uchun emailni Celery orqali yuboramiz.
-    # Redis/Celery ishlamayotgan development holatida auth endpointlar yiqilmasligi uchun fail-open.
+    # Redis ishlamayotgan development holatida SMTP sozlangan bo'lsa to'g'ridan-to'g'ri yuboramiz.
     parsed = urlparse(settings.redis_url)
     redis_host = parsed.hostname or "localhost"
     redis_port = parsed.port or 6379
@@ -15,13 +20,13 @@ async def send_email(to_email: str, subject: str, body: str) -> None:
         with create_connection((redis_host, redis_port), timeout=0.3):
             pass
     except OSError:
-        print(f"[EMAIL-FALLBACK] To={to_email} | Subject={subject} | Body={body}")
+        await asyncio.to_thread(send_email_now, to_email, subject, body)
         return
 
     try:
         send_email_task.delay(to_email, subject, body)
     except Exception:
-        print(f"[EMAIL-FALLBACK] To={to_email} | Subject={subject} | Body={body}")
+        await asyncio.to_thread(send_email_now, to_email, subject, body)
 
 
 async def send_verification_code(email: str, code: str) -> None:

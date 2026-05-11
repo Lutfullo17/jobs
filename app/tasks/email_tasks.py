@@ -7,13 +7,18 @@ from app.core.config import settings
 
 @celery_app.task(name="send_email_task", ignore_result=True)
 def send_email_task(to_email: str, subject: str, body: str) -> None:
+    send_email_now(to_email, subject, body)
+
+
+def send_email_now(to_email: str, subject: str, body: str) -> None:
     # SMTP login bo'lmasa local development uchun faqat print qilamiz.
     if not settings.smtp_user or not settings.smtp_password:
-        print(f"[EMAIL-DEV][CELERY] To={to_email} | Subject={subject} | Body={body}")
+        print(f"[EMAIL-DEV] To={to_email} | Subject={subject} | Body={body}")
         return
 
     message = EmailMessage()
-    message["From"] = str(settings.email_from)
+    from_email = settings.smtp_user if str(settings.email_from) == "noreply@example.com" else str(settings.email_from)
+    message["From"] = from_email
     message["To"] = to_email
     message["Subject"] = subject
     message.set_content(body)

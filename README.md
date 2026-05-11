@@ -215,6 +215,7 @@ Majburiy/asosiy qiymatlar:
 - `EMAIL_FROM`
 - `SMTP_USE_TLS`
 - `SMTP_USE_STARTTLS`
+- `EMAIL_DELIVERY_MODE` (`direct` yoki `celery`)
 - `REDIS_URL`
 - `RATE_LIMIT_LOGIN_LIMIT`
 - `RATE_LIMIT_LOGIN_WINDOW_SECONDS`
@@ -273,6 +274,23 @@ uvicorn main:app --reload
 ```bash
 celery -A app.core.celery_app.celery_app worker --loglevel=info -Q celery
 ```
+
+Gmailga real kod yuborish uchun `.env`:
+
+```env
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your_email@gmail.com
+SMTP_PASSWORD=your_gmail_app_password
+EMAIL_FROM=your_email@gmail.com
+SMTP_USE_TLS=false
+SMTP_USE_STARTTLS=true
+EMAIL_DELIVERY_MODE=direct
+```
+
+`SMTP_PASSWORD` joyiga oddiy Gmail parol emas, Gmail App Password yoziladi.
+App Password olish uchun Gmail akkauntda 2-Step Verification yoqilgan bo'lishi kerak.
+Faqat `uvicorn` bilan ishlatsangiz `EMAIL_DELIVERY_MODE=direct` qiling; `EMAIL_DELIVERY_MODE=celery` bo'lsa Redis va Celery worker ham ishlashi kerak.
 
 ---
 
