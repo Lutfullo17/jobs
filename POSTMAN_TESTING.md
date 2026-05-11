@@ -44,6 +44,13 @@ Masalan:
 [EMAIL-DEV][CELERY] To=candidate@example.com | Subject=... | Body=Sizning tasdiqlash kodingiz: 123456
 ```
 
+Server terminalida kod alohida ham print bo'ladi:
+
+```text
+[VERIFICATION-CODE] email=candidate@example.com code=123456
+[RESET-CODE] email=candidate@example.com code=654321
+```
+
 Gmailga kod kelishi uchun `.env` ichida shunday yozing:
 
 ```text
