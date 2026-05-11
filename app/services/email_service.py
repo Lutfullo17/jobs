@@ -1,9 +1,12 @@
 import asyncio
+import logging
 from socket import create_connection
 from urllib.parse import urlparse
 
 from app.core.config import settings
 from app.tasks.email_tasks import send_email_now, send_email_task
+
+logger = logging.getLogger("uvicorn.error")
 
 
 async def send_email(to_email: str, subject: str, body: str) -> None:
@@ -30,14 +33,14 @@ async def send_email(to_email: str, subject: str, body: str) -> None:
 
 
 async def send_verification_code(email: str, code: str) -> None:
-    print(f"[VERIFICATION-CODE] email={email} code={code}")
+    _print_code("VERIFICATION-CODE", email, code)
     subject = "Jobify - Email Verification Code"
     body = f"Sizning tasdiqlash kodingiz: {code}\nKod 10 daqiqa amal qiladi."
     await send_email(email, subject, body)
 
 
 async def send_password_reset_code(email: str, code: str) -> None:
-    print(f"[RESET-CODE] email={email} code={code}")
+    _print_code("RESET-CODE", email, code)
     subject = "Jobify - Password Reset Code"
     body = f"Sizning parol tiklash kodingiz: {code}\nKod 10 daqiqa amal qiladi."
     await send_email(email, subject, body)
@@ -54,6 +57,7 @@ async def send_hr_registration_admin_notification(admin_email: str, hr_email: st
     await send_email(admin_email, subject, body)
 
 
-
-
-    
+def _print_code(label: str, email: str, code: str) -> None:
+    message = f"[{label}] email={email} code={code}"
+    print(message, flush=True)
+    logger.warning(message)

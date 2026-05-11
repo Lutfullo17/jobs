@@ -51,6 +51,23 @@ Server terminalida kod alohida ham print bo'ladi:
 [RESET-CODE] email=candidate@example.com code=654321
 ```
 
+Kod terminalga chiqmasa tekshiring:
+
+```text
+1. Postman URL siz ishlatayotgan port bo'lishi kerak.
+   Masalan uvicorn --port 8001 bo'lsa:
+   http://127.0.0.1:8001/api/auth/register/
+
+2. Kod faqat shu requestlarda chiqadi:
+   POST /api/auth/register/
+   POST /api/auth/resend-verification-code/
+   POST /api/auth/forgot-password/
+
+3. Oldin register qilingan email bilan qayta register qilsangiz 409 qaytadi,
+   bunday holatda yangi kod yaratilmaydi.
+   Yangi email yozing yoki resend-verification-code ishlating.
+```
+
 Gmailga kod kelishi uchun `.env` ichida shunday yozing:
 
 ```text
