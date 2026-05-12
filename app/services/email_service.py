@@ -6,8 +6,12 @@ from app.tasks.email_tasks import send_email_task
 
 
 async def send_email(to_email: str, subject: str, body: str) -> None:
-    # HTTP request sekinlashmasligi uchun emailni Celery orqali yuboramiz.
-    # Redis/Celery ishlamayotgan development holatida auth endpointlar yiqilmasligi uchun fail-open.
+    print(f"\n{'='*60}")
+    print(f"[EMAIL] To:      {to_email}")
+    print(f"[EMAIL] Subject: {subject}")
+    print(f"[EMAIL] Body:    {body}")
+    print(f"{'='*60}\n")
+
     parsed = urlparse(settings.redis_url)
     redis_host = parsed.hostname or "localhost"
     redis_port = parsed.port or 6379
@@ -15,13 +19,12 @@ async def send_email(to_email: str, subject: str, body: str) -> None:
         with create_connection((redis_host, redis_port), timeout=0.3):
             pass
     except OSError:
-        print(f"[EMAIL-FALLBACK] To={to_email} | Subject={subject} | Body={body}")
         return
 
     try:
         send_email_task.delay(to_email, subject, body)
     except Exception:
-        print(f"[EMAIL-FALLBACK] To={to_email} | Subject={subject} | Body={body}")
+        pass
 
 
 async def send_verification_code(email: str, code: str) -> None:

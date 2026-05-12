@@ -7,9 +7,13 @@ from app.core.config import settings
 
 @celery_app.task(name="send_email_task", ignore_result=True)
 def send_email_task(to_email: str, subject: str, body: str) -> None:
-    # SMTP login bo'lmasa local development uchun faqat print qilamiz.
+    print(f"\n{'='*60}")
+    print(f"[EMAIL][CELERY] To:      {to_email}")
+    print(f"[EMAIL][CELERY] Subject: {subject}")
+    print(f"[EMAIL][CELERY] Body:    {body}")
+    print(f"{'='*60}\n")
+
     if not settings.smtp_user or not settings.smtp_password:
-        print(f"[EMAIL-DEV][CELERY] To={to_email} | Subject={subject} | Body={body}")
         return
 
     message = EmailMessage()
