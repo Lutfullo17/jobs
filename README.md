@@ -759,12 +759,21 @@ Docker build vaqtida shunday xato chiqsa:
 target celery-worker: failed to receive status: rpc error: code = Unavailable desc = error reading from server: EOF
 ```
 
+Yoki container yaratishda shunday xato chiqsa:
+
+```text
+request returned 502 Bad Gateway for API route ... containers/create?name=jobify-app
+```
+
 Bu odatda Docker Desktop/BuildKit build jarayonida uzilib qolganini bildiradi. Loyiha `docker-compose.yml`da bitta `jobs-app:latest` image build qiladi, `celery-worker` ham shu image'dan ishlaydi.
 
-Qayta urinish uchun:
+Build yengilroq bo'lishi uchun `.dockerignore` qo'shilgan va Dockerfile faqat kerakli fayllarni image ichiga copy qiladi.
 
-```bash
+Windows PowerShell'da qayta urinish uchun:
+
+```powershell
 docker compose down
+docker builder prune -f
 docker compose build --no-cache app
 docker compose up
 ```
@@ -773,9 +782,24 @@ Agar yana chiqsa:
 
 ```text
 1. Docker Desktopni restart qiling.
-2. Eski alohida redis containerlarni stop/delete qiling.
-3. Docker Desktop resources/memory yetarli ekanini tekshiring.
-4. Qayta docker compose up --build qiling.
+2. PowerShellni yopib qayta oching.
+3. docker context use desktop-linux commandini ishlating.
+4. Eski alohida redis containerlarni stop/delete qiling.
+5. Docker Desktop resources/memory yetarli ekanini tekshiring.
+6. Qayta docker compose up --build qiling.
+```
+
+Docker Desktop engine nosog'lom bo'lib qolsa:
+
+```powershell
+wsl --shutdown
+```
+
+Keyin Docker Desktopni qayta oching va:
+
+```powershell
+docker ps
+docker compose up --build
 ```
 
 ---
