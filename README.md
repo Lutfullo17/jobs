@@ -753,6 +753,30 @@ DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/jobify
 REDIS_URL=redis://redis:6379/0
 ```
 
+`docker-compose.yml` Docker ichida `DATABASE_URL` va `REDIS_URL` ni o'zi `db`/`redis` qilib override qiladi. Shuning uchun `.env` ichida local uchun `localhost` yozilgan bo'lsa ham Docker app container noto'g'ri hostga ulanib qolmaydi.
+
+Browserda `ERR_CONNECTION_REFUSED` chiqsa:
+
+```text
+1. jobify-app container ishlamayotgan bo'lishi mumkin.
+2. Docker Desktop -> Containers -> jobify-app -> Logs ni oching.
+3. Yoki terminalda:
+```
+
+```powershell
+docker compose ps
+docker compose logs app
+```
+
+Normal holatda quyidagilar running bo'lishi kerak:
+
+```text
+jobify-app
+jobify-db
+jobify-redis
+jobify-celery-worker
+```
+
 Docker build vaqtida shunday xato chiqsa:
 
 ```text
