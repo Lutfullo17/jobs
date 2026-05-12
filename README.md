@@ -753,6 +753,31 @@ DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/jobify
 REDIS_URL=redis://redis:6379/0
 ```
 
+Docker build vaqtida shunday xato chiqsa:
+
+```text
+target celery-worker: failed to receive status: rpc error: code = Unavailable desc = error reading from server: EOF
+```
+
+Bu odatda Docker Desktop/BuildKit build jarayonida uzilib qolganini bildiradi. Loyiha `docker-compose.yml`da bitta `jobs-app:latest` image build qiladi, `celery-worker` ham shu image'dan ishlaydi.
+
+Qayta urinish uchun:
+
+```bash
+docker compose down
+docker compose build --no-cache app
+docker compose up
+```
+
+Agar yana chiqsa:
+
+```text
+1. Docker Desktopni restart qiling.
+2. Eski alohida redis containerlarni stop/delete qiling.
+3. Docker Desktop resources/memory yetarli ekanini tekshiring.
+4. Qayta docker compose up --build qiling.
+```
+
 ---
 
 ### Local bilan
