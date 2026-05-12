@@ -40,8 +40,10 @@ services:
   redis:
     image: redis:7
     container_name: jobify-redis
+    # Windows: netsh excludedportrange ichida 6356-6455 (6379/6380 shu yerda). Tashqi portni bundan tashqariga qo'ying.
+    # Tashqi ulanish: localhost:6500 (ichki servislar baribir redis:6379).
     ports:
-      - "6379:6379"
+      - "6500:6379"
 
 volumes:
   pg_data:
