@@ -12,6 +12,6 @@ if not exist ".env" (
 echo Uvicorn: http://127.0.0.1:8001/docs  (Ctrl+C to'xtatish)
 echo DB/Redis Dockerda bo'lsa: docker compose up -d db redis celery-worker
 set PYTHONUNBUFFERED=1
-set DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/jobify
+set DATABASE_URL=postgresql+asyncpg://postgres:123@127.0.0.1:5432/jobify
 set REDIS_URL=redis://127.0.0.1:6500/0
 .\venv\Scripts\python.exe -m uvicorn main:app --reload --host 127.0.0.1 --port 8001

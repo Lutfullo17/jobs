@@ -10,7 +10,6 @@ class CandidateVacancyListItem(VacancyPublicListItem):
     """Vakansiya qidiruvi — nomzod uchun qo'shimcha flaglar."""
 
     already_applied: bool = False
-    is_saved: bool = False
     application_id: int | None = None
     application_status: ApplicationStatus | None = None
 

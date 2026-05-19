@@ -122,7 +122,7 @@ async def login_user(
     payload: LoginRequest,
     user_agent: str | None,
     ip_address: str | None,
-) -> tuple[str, str, User]:
+) -> tuple[str, str]:
     user_result = await db.execute(select(User).where(User.email == payload.email))
     user = user_result.scalar_one_or_none()
     if not user or not verify_password(payload.password, user.password_hash):
@@ -148,7 +148,7 @@ async def login_user(
         )
     )
     await db.commit()
-    return access_token, refresh_token, user
+    return access_token, refresh_token
 
 
 async def refresh_access_token(db: AsyncSession, refresh_token: str) -> tuple[str, str]:

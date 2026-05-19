@@ -28,24 +28,17 @@ from app.schemas.hr_vacancy import (
     VacancyHrItem,
     VacancyUpdateBody,
 )
-from app.schemas.platform import ApplicationStatusUpdateBody, InterviewOut, InterviewScheduleBody, PipelineStageCount
-from app.services.interview_service import schedule_interview
 from app.services.vacancy_application_service import (
     accept_application,
     append_chat_message,
-    archive_vacancy,
     close_vacancy,
-    count_applications_by_status,
     create_vacancy,
-    duplicate_vacancy,
     get_application_for_hr,
     list_hr_applications_filtered,
     list_hr_vacancies,
     get_hr_vacancy,
-    publish_vacancy,
     reject_application,
     soft_delete_vacancy,
-    update_application_status,
     update_vacancy,
 )
 from app.services.resume_service import get_candidate_resume
@@ -104,36 +97,12 @@ async def update_vacancy_endpoint(
     return VacancyHrItem.model_validate(v)
 
 
-@router.post("/vacancies/{vacancy_id}/publish/", response_model=VacancyActionResponse)
-async def publish_vacancy_endpoint(
-    vacancy_id: int, db: AsyncSession = Depends(get_db), hr: User = Depends(require_approved_hr)
-) -> VacancyActionResponse:
-    v = await publish_vacancy(db, vacancy_id, hr.id)
-    return VacancyActionResponse(id=v.id, status=v.status, message="Vakansiya e'lon qilindi.")
-
-
-@router.post("/vacancies/{vacancy_id}/archive/", response_model=VacancyActionResponse)
-async def archive_vacancy_endpoint(
-    vacancy_id: int, db: AsyncSession = Depends(get_db), hr: User = Depends(require_approved_hr)
-) -> VacancyActionResponse:
-    v = await archive_vacancy(db, vacancy_id, hr.id)
-    return VacancyActionResponse(id=v.id, status=v.status, message="Arxivlandi.")
-
-
 @router.post("/vacancies/{vacancy_id}/close/", response_model=VacancyActionResponse)
 async def close_vacancy_endpoint(
     vacancy_id: int, db: AsyncSession = Depends(get_db), hr: User = Depends(require_approved_hr)
 ) -> VacancyActionResponse:
     v = await close_vacancy(db, vacancy_id, hr.id)
     return VacancyActionResponse(id=v.id, status=v.status, message="Yopildi.")
-
-
-@router.post("/vacancies/{vacancy_id}/duplicate/", response_model=VacancyHrItem, status_code=201)
-async def duplicate_vacancy_endpoint(
-    vacancy_id: int, db: AsyncSession = Depends(get_db), hr: User = Depends(require_approved_hr)
-) -> VacancyHrItem:
-    v = await duplicate_vacancy(db, vacancy_id, hr.id)
-    return VacancyHrItem.model_validate(v)
 
 
 @router.delete("/vacancies/{vacancy_id}/", response_model=VacancyDeletedResponse)
@@ -258,46 +227,6 @@ async def reject_candidate(
 ) -> RecruitmentActionResponse:
     a = await reject_application(db, application_id=application_id, hr=hr, rejection_reason=rejection_reason)
     return RecruitmentActionResponse(application_id=a.id, status=a.status, message="Murojaat rad etildi.")
-
-
-@router.patch("/applications/{application_id}/status/", response_model=RecruitmentActionResponse)
-async def patch_application_status(
-    application_id: int,
-    payload: ApplicationStatusUpdateBody,
-    db: AsyncSession = Depends(get_db),
-    hr: User = Depends(require_approved_hr),
-) -> RecruitmentActionResponse:
-    a = await update_application_status(
-        db,
-        application_id=application_id,
-        hr=hr,
-        new_status=payload.status,
-        hr_note=payload.hr_note,
-        internal_comment=payload.internal_comment,
-        rating=payload.rating,
-        rejection_reason=payload.rejection_reason,
-    )
-    return RecruitmentActionResponse(application_id=a.id, status=a.status, message="Holat yangilandi.")
-
-
-@router.get("/applications/pipeline/", response_model=list[PipelineStageCount])
-async def pipeline_counts(
-    db: AsyncSession = Depends(get_db),
-    hr: User = Depends(require_approved_hr),
-) -> list[PipelineStageCount]:
-    counts = await count_applications_by_status(db, hr.id)
-    return [PipelineStageCount(status=k, count=v) for k, v in counts.items()]
-
-
-@router.post("/applications/{application_id}/schedule-interview/", response_model=InterviewOut, status_code=201)
-async def schedule_interview_endpoint(
-    application_id: int,
-    payload: InterviewScheduleBody,
-    db: AsyncSession = Depends(get_db),
-    hr: User = Depends(require_approved_hr),
-) -> InterviewOut:
-    row = await schedule_interview(db, application_id=application_id, hr=hr, payload=payload)
-    return InterviewOut.model_validate(row)
 
 
 @router.post("/applications/{application_id}/messages/", response_model=RecruitmentChatResponse)

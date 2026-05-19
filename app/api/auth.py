@@ -16,7 +16,7 @@ from app.schemas.auth import (
     RegisterRequest,
     RegisterResponse,
     ResetPasswordRequest,
-    TokenResponse,
+    LoginResponse,
     UserOut,
     VerifyEmailRequest,
     VerifyEmailResponse,
@@ -77,8 +77,8 @@ async def resend_verification_endpoint(
     return MessageResponse(message="Tasdiqlash kodi yuborildi.")
 
 
-@router.post("/login/", response_model=TokenResponse)
-async def login(payload: LoginRequest, request: Request, db: AsyncSession = Depends(get_db)) -> TokenResponse:
+@router.post("/login/", response_model=LoginResponse)
+async def login(payload: LoginRequest, request: Request, db: AsyncSession = Depends(get_db)) -> LoginResponse:
     client_ip = request.client.host if request.client else "unknown"
     rate_key = f"rate:login:{client_ip}:{payload.email}"
     allowed = await enforce_rate_limit(
@@ -92,16 +92,16 @@ async def login(payload: LoginRequest, request: Request, db: AsyncSession = Depe
             detail="Ko'p login urinishlar. Qayta urinib ko'ring.",
         )
 
-    access_token, refresh_token, user = await login_user(
+    access_token, refresh_token = await login_user(
         db=db,
         payload=payload,
         user_agent=request.headers.get("user-agent"),
         ip_address=request.client.host if request.client else None,
     )
-    return TokenResponse(
+    return LoginResponse(
         access_token=access_token,
         refresh_token=refresh_token,
-        user=UserOut.model_validate(user),
+        message="Siz login qilindiz.",
     )
 
 
@@ -126,8 +126,14 @@ async def logout_all_endpoint(
     return MessageResponse(message=f"Barcha qurilmalar chiqib ketildi. Revoked tokens: {revoked_count}")
 
 
-@router.get("/me/", response_model=UserOut)
+@router.get("/me/", response_model=UserOut, summary="Joriy foydalanuvchi (profil)")
 async def me(current_user: User = Depends(get_current_user)) -> UserOut:
+    return UserOut.model_validate(current_user)
+
+
+@router.get("/profile/", response_model=UserOut, summary="Profil (login dan keyin)")
+async def profile(current_user: User = Depends(get_current_user)) -> UserOut:
+    """Login faqat token qaytaradi; email, rol va boshqa ma'lumotlar shu yerda."""
     return UserOut.model_validate(current_user)
 
 

@@ -127,11 +127,11 @@ Base prefix: `/api/auth`
 - `POST /register/`
 - `POST /verify-email/`
 - `POST /resend-verification-code/`
-- `POST /login/`
+- `POST /login/` — faqat `access_token`, `refresh_token`, `message` (user yo‘q)
 - `POST /refresh/`
 - `POST /logout/`
 - `POST /logout-all/`
-- `GET /me/`
+- `GET /me/` yoki `GET /profile/` — email, rol va boshqa hisob ma’lumotlari
 - `POST /change-password/`
 - `POST /forgot-password/`
 - `POST /reset-password/`
@@ -149,10 +149,8 @@ Swagger: `http://localhost:8001/docs`
 | `GET /api/candidate/vacancies/filters/` | Filter variantlari (enum ro‘yxati) |
 | `GET /api/candidate/applications/` | Murojaatlar filter + pagination |
 | `GET /api/candidate/applications/filters/` | Murojaat filter variantlari |
-| `GET /api/candidate/favorites/` | Sevimlilar (`q`, `location`, `company_name`) |
-| `GET /api/candidate/saved-searches/{id}/results/` | Saqlangan qidiruvni ishga tushirish |
 
-Vakansiya qidiruv parametrlari: `q`, `location`, `company_name`, `employment_type`, `work_mode`, `experience_level`, `industry`, `skill`, `remote_only`, `verified_company_only`, `posted_within_days`, `salary_from`, `salary_to`, `exclude_applied`, `favorites_only`, `sort_by`, `page`, `page_size`.
+Vakansiya qidiruv parametrlari: `q`, `location`, `company_name`, `employment_type`, `work_mode`, `experience_level`, `industry`, `skill`, `remote_only`, `verified_company_only`, `posted_within_days`, `salary_from`, `salary_to`, `exclude_applied`, `sort_by`, `page`, `page_size`.
 
 ---
 
@@ -291,8 +289,13 @@ uvicorn main:app --reload --host 127.0.0.1 --port 8001
 5. Celery worker (alohida terminalda):
 
 ```bash
-celery -A app.core.celery_app.celery_app worker --loglevel=info -Q celery
+# Windows: prefork ishlamaydi — solo pool (run-celery.bat yoki --pool=solo)
+run-celery.bat
+# yoki:
+celery -A app.core.celery_app.celery_app worker --loglevel=info -Q celery --pool=solo
 ```
+
+Linux/Docker: `docker compose up -d celery-worker` (prefork normal).
 
 ---
 

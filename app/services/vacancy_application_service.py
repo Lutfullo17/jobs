@@ -61,7 +61,6 @@ async def list_active_vacancies(
     page_size: int = 20,
     candidate_id: int | None = None,
     exclude_applied: bool = False,
-    favorites_only: bool = False,
 ) -> tuple[list[Vacancy], int]:
     today = datetime.now(UTC).date()
     stmt = select(Vacancy).where(
@@ -110,12 +109,6 @@ async def list_active_vacancies(
 
         stmt = stmt.join(Company, Company.id == Vacancy.company_id, isouter=True).where(Company.verified.is_(True))
 
-    if favorites_only and candidate_id:
-        from app.models.platform import SavedVacancy
-
-        stmt = stmt.join(SavedVacancy, SavedVacancy.vacancy_id == Vacancy.id).where(
-            SavedVacancy.candidate_id == candidate_id
-        )
     if exclude_applied and candidate_id:
         applied_ids = select(VacancyApplication.vacancy_id).where(
             VacancyApplication.candidate_id == candidate_id
@@ -202,68 +195,12 @@ async def update_vacancy(db: AsyncSession, vacancy_id: int, hr_id: int, payload:
     return v
 
 
-async def publish_vacancy(db: AsyncSession, vacancy_id: int, hr_id: int) -> Vacancy:
-    v = await get_hr_vacancy(db, vacancy_id, hr_id)
-    if v.status not in (VacancyStatus.draft, VacancyStatus.on_moderation):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Faqat draft/moderatsiyadan publish qilinadi.")
-    v.status = VacancyStatus.published
-    v.published_at = datetime.now(UTC)
-    await db.commit()
-    await db.refresh(v)
-    return v
-
-
-async def archive_vacancy(db: AsyncSession, vacancy_id: int, hr_id: int) -> Vacancy:
-    v = await get_hr_vacancy(db, vacancy_id, hr_id)
-    v.status = VacancyStatus.archived
-    await db.commit()
-    await db.refresh(v)
-    return v
-
-
 async def close_vacancy(db: AsyncSession, vacancy_id: int, hr_id: int) -> Vacancy:
     v = await get_hr_vacancy(db, vacancy_id, hr_id)
     v.status = VacancyStatus.closed
     await db.commit()
     await db.refresh(v)
     return v
-
-
-async def duplicate_vacancy(db: AsyncSession, vacancy_id: int, hr_id: int) -> Vacancy:
-    src = await get_hr_vacancy(db, vacancy_id, hr_id)
-    copy = Vacancy(
-        hr_id=src.hr_id,
-        company_id=src.company_id,
-        title=f"{src.title} (nusxa)",
-        description=src.description,
-        company_name=src.company_name,
-        location=src.location,
-        employment_type=src.employment_type,
-        work_mode=src.work_mode,
-        status=VacancyStatus.draft,
-        experience_level=src.experience_level,
-        industry=src.industry,
-        skills_required=src.skills_required,
-        headcount=src.headcount,
-        screening_questions=src.screening_questions,
-        is_remote_worldwide=src.is_remote_worldwide,
-        salary_from=src.salary_from,
-        salary_to=src.salary_to,
-        salary_currency=src.salary_currency,
-        salary_negotiable=src.salary_negotiable,
-        responsibilities=src.responsibilities,
-        requirements=src.requirements,
-        benefits=src.benefits,
-        experience_note=src.experience_note,
-        education_note=src.education_note,
-        contact_phone=src.contact_phone,
-        expires_at=src.expires_at,
-        is_deleted=False,
-    )
-    db.add(copy)
-    await db.commit()
-    await db.refresh(copy)
-    return copy
 
 
 async def list_hr_vacancies(db: AsyncSession, hr_id: int) -> list[Vacancy]:
@@ -344,10 +281,10 @@ _TERMINAL_APPLICATION_STATUSES = frozenset(
 
 async def get_candidate_vacancy_meta(
     db: AsyncSession, candidate_id: int, vacancy_ids: list[int]
-) -> tuple[set[int], set[int], dict[int, VacancyApplication]]:
-    """applied_ids, saved_ids, application_by_vacancy_id"""
+) -> tuple[set[int], dict[int, VacancyApplication]]:
+    """applied_ids, application_by_vacancy_id"""
     if not vacancy_ids:
-        return set(), set(), {}
+        return set(), {}
     app_q = await db.execute(
         select(VacancyApplication).where(
             VacancyApplication.candidate_id == candidate_id,
@@ -357,17 +294,7 @@ async def get_candidate_vacancy_meta(
     apps = list(app_q.scalars().all())
     applied_ids = {a.vacancy_id for a in apps}
     app_map = {a.vacancy_id: a for a in apps}
-
-    from app.models.platform import SavedVacancy
-
-    fav_q = await db.execute(
-        select(SavedVacancy.vacancy_id).where(
-            SavedVacancy.candidate_id == candidate_id,
-            SavedVacancy.vacancy_id.in_(vacancy_ids),
-        )
-    )
-    saved_ids = set(fav_q.scalars().all())
-    return applied_ids, saved_ids, app_map
+    return applied_ids, app_map
 
 
 async def list_candidate_applications_filtered(
@@ -572,26 +499,6 @@ async def update_application_status(
     await db.commit()
     await db.refresh(app_row)
     return app_row
-
-
-async def withdraw_application(db: AsyncSession, application_id: int, candidate_id: int) -> VacancyApplication:
-    app_row = await get_application_for_candidate(db, application_id, candidate_id)
-    if app_row.status in (ApplicationStatus.hired, ApplicationStatus.rejected, ApplicationStatus.withdrawn):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Murojaatni bekor qilib bo'lmaydi.")
-    app_row.status = ApplicationStatus.withdrawn
-    await db.commit()
-    await db.refresh(app_row)
-    return app_row
-
-
-async def count_applications_by_status(db: AsyncSession, hr_id: int) -> dict[str, int]:
-    q = await db.execute(
-        select(VacancyApplication.status, func.count())
-        .join(Vacancy, Vacancy.id == VacancyApplication.vacancy_id)
-        .where(Vacancy.hr_id == hr_id)
-        .group_by(VacancyApplication.status)
-    )
-    return {str(row[0].value if hasattr(row[0], "value") else row[0]): row[1] for row in q.all()}
 
 
 async def append_chat_message(db: AsyncSession, *, application_id: int, sender: User, body: str) -> ApplicationMessage:

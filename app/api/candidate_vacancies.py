@@ -50,7 +50,6 @@ async def search_vacancies_for_candidate(
     salary_currency: str | None = Query(None),
     salary_negotiable: bool | None = Query(None),
     exclude_applied: bool = Query(False, description="Murojaat qilgan vakansiyalarni yashirish"),
-    favorites_only: bool = Query(False, description="Faqat sevimlilar"),
     sort_by: str = Query("date_desc", pattern="^(date_desc|salary_desc|relevance)$"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -77,17 +76,15 @@ async def search_vacancies_for_candidate(
         page_size=page_size,
         candidate_id=candidate.id,
         exclude_applied=exclude_applied,
-        favorites_only=favorites_only,
     )
     ids = [v.id for v in rows]
-    applied_ids, saved_ids, app_map = await get_candidate_vacancy_meta(db, candidate.id, ids)
+    applied_ids, app_map = await get_candidate_vacancy_meta(db, candidate.id, ids)
 
     items: list[CandidateVacancyListItem] = []
     for v in rows:
         app = app_map.get(v.id)
         item = CandidateVacancyListItem.model_validate(v)
         item.already_applied = v.id in applied_ids
-        item.is_saved = v.id in saved_ids
         if app:
             item.application_id = app.id
             item.application_status = app.status

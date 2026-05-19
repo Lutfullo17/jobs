@@ -1,93 +1,50 @@
 from datetime import date, datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 from app.models.candidate_profile import PreferredWorkMode
 
 
-class ExperienceIn(BaseModel):
-    company_name: str = Field(min_length=1, max_length=255)
-    position: str = Field(min_length=1, max_length=200)
+class ExperienceOut(BaseModel):
+    company_name: str
+    position: str
     started_at: date | None = None
     ended_at: date | None = None
     is_current: bool = False
     description: str = ""
+    id: int
+    model_config = ConfigDict(from_attributes=True)
 
 
-class EducationIn(BaseModel):
-    institution: str = Field(min_length=1, max_length=255)
+class EducationOut(BaseModel):
+    institution: str
     degree: str = ""
     field_of_study: str = ""
     started_at: date | None = None
     ended_at: date | None = None
+    id: int
+    model_config = ConfigDict(from_attributes=True)
 
 
-class SkillIn(BaseModel):
-    name: str = Field(min_length=1, max_length=120)
+class SkillOut(BaseModel):
+    name: str
     level: str = ""
+    id: int
+    model_config = ConfigDict(from_attributes=True)
 
 
-class LanguageIn(BaseModel):
-    language: str = Field(min_length=1, max_length=80)
+class LanguageOut(BaseModel):
+    language: str
     level: str = ""
+    id: int
+    model_config = ConfigDict(from_attributes=True)
 
 
-class CertificateIn(BaseModel):
-    title: str = Field(min_length=1, max_length=255)
+class CertificateOut(BaseModel):
+    title: str
     issuer: str = ""
     issued_at: date | None = None
     credential_url: str | None = None
-
-
-class ProfileUpdateBody(BaseModel):
-    first_name: str | None = Field(None, max_length=100)
-    last_name: str | None = Field(None, max_length=100)
-    phone: str | None = Field(None, max_length=50)
-    birth_date: date | None = None
-    city: str | None = Field(None, max_length=120)
-    country: str | None = Field(None, max_length=120)
-    telegram: str | None = None
-    linkedin: str | None = None
-    github: str | None = None
-    portfolio_url: str | None = None
-    about_me: str | None = None
-    expected_salary_from: int | None = Field(None, ge=0)
-    expected_salary_to: int | None = Field(None, ge=0)
-    currency: str | None = Field(None, max_length=10)
-    preferred_work_mode: PreferredWorkMode | None = None
-    preferred_employment_type: str | None = None
-    profile_visible: bool | None = None
-
-
-class ProfileFullUpdateBody(ProfileUpdateBody):
-    experiences: list[ExperienceIn] | None = None
-    educations: list[EducationIn] | None = None
-    skills: list[SkillIn] | None = None
-    languages: list[LanguageIn] | None = None
-    certificates: list[CertificateIn] | None = None
-
-
-class ExperienceOut(ExperienceIn):
-    id: int
-    model_config = ConfigDict(from_attributes=True)
-
-
-class EducationOut(EducationIn):
-    id: int
-    model_config = ConfigDict(from_attributes=True)
-
-
-class SkillOut(SkillIn):
-    id: int
-    model_config = ConfigDict(from_attributes=True)
-
-
-class LanguageOut(LanguageIn):
-    id: int
-    model_config = ConfigDict(from_attributes=True)
-
-
-class CertificateOut(CertificateIn):
     id: int
     model_config = ConfigDict(from_attributes=True)
 

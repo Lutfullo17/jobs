@@ -66,11 +66,11 @@ class VerifyEmailResponse(BaseModel):
     message: str
 
 
-class TokenResponse(BaseModel):
+class LoginResponse(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
-    user: UserOut
+    message: str = "Siz login qilindiz."
 
 
 class AccessTokenResponse(BaseModel):
