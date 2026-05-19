@@ -1,3 +1,8 @@
+"""
+Celery orqali email yuborish, redis orqali hamma narsa tez ishlashini taminlash.
+"""
+
+
 import sys
 
 from celery import Celery

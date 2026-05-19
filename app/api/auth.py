@@ -185,3 +185,17 @@ async def candidate_only_endpoint(
     current_user: User = Depends(require_role(UserRole.candidate)),
 ) -> MessageResponse:
     return MessageResponse(message=f"Candidate access OK (user_id={current_user.id}).")
+
+
+# Register
+# → Verify Email
+# → Login
+# → Token
+# → Logout
+# → Password Reset
+
+# Va xavfsizlik uchun:
+
+# JWT token
+# role check
+# rate limit

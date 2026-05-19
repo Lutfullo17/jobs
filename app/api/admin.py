@@ -118,3 +118,12 @@ async def admin_close_thread(
     await close_thread_admin(db, thread_id=thread_id, admin=admin_user)
     t = await reload_support_thread_with_creator(db, thread_id)
     return _support_thread_admin_list_item(t)
+
+
+# Asosiy vazifalari:
+
+# HR userlarni tasdiqlash
+# Support murojaatlarni ko‘rish
+# Chatdagi xabarlarni olish
+# Javob yozish
+# Murojaatni yopish
