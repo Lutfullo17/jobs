@@ -3,6 +3,7 @@ from uuid import uuid4
 
 from fastapi import HTTPException, status
 from sqlalchemy import and_, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -54,10 +55,17 @@ async def register_user(db: AsyncSession, payload: RegisterRequest) -> User:
     )
     db.add(user)
     await db.flush()
-
-    await _create_and_send_verification_code(db, user)
-    await db.commit()
+    code = await _create_verification_code(db, user)
+    try:
+        await db.commit()
+    except IntegrityError as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Elektron pochta allaqachon mavjud.",
+        ) from exc
     await db.refresh(user)
+    await send_verification_code(user.email, code)
 
     if user.role == UserRole.hr:
         await _notify_admins_new_hr_registration(db, user)
@@ -104,17 +112,9 @@ async def resend_verification_code(db: AsyncSession, email: str) -> None:
     if user.is_verified:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Foydalanuvchi allaqachon tekshirilgan.")
 
-    one_minute_ago = datetime.now(UTC) - timedelta(minutes=1)
-    rate_result = await db.execute(
-        select(EmailVerificationCode)
-        .where(and_(EmailVerificationCode.user_id == user.id, EmailVerificationCode.created_at >= one_minute_ago))
-        .order_by(EmailVerificationCode.created_at.desc())
-    )
-    if rate_result.scalars().first():
-        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="1 daqiqadan keyin yana urinib ko'ring.")
-
-    await _create_and_send_verification_code(db, user)
+    code = await _create_verification_code(db, user)
     await db.commit()
+    await send_verification_code(user.email, code)
 
 
 async def login_user(
@@ -166,7 +166,10 @@ async def refresh_access_token(db: AsyncSession, refresh_token: str) -> tuple[st
     if not user or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Yangilash token foydalanuvchisi noto'g'ri.")
 
-    token_result = await db.execute(select(RefreshToken).where(RefreshToken.token_hash == hash_token(refresh_token)))
+    token_hash_value = hash_token(refresh_token)
+    token_result = await db.execute(
+        select(RefreshToken).where(RefreshToken.token_hash == token_hash_value).with_for_update()
+    )
     token_obj = token_result.scalar_one_or_none()
     if not token_obj or token_obj.revoked_at is not None or token_obj.expires_at < datetime.now(UTC):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Yangilash tokenining muddati tugagan yoki bekor qilingan.")
@@ -230,10 +233,7 @@ async def forgot_password(db: AsyncSession, payload: ForgotPasswordRequest) -> N
     user_result = await db.execute(select(User).where(User.email == payload.email))
     user = user_result.scalar_one_or_none()
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Bu email ro'yxatdan o'tmagan. Iltimos, ro'yxatdan o'ting.",
-        )
+        return
 
     await db.execute(
         update(PasswordResetCode).where(
@@ -300,7 +300,7 @@ async def _notify_admins_new_hr_registration(db: AsyncSession, hr_user: User) ->
         await send_hr_registration_admin_notification(admin_email, hr_user.email, hr_user.id)
 
 
-async def _create_and_send_verification_code(db: AsyncSession, user: User) -> None:
+async def _create_verification_code(db: AsyncSession, user: User) -> str:
     await db.execute(
         update(EmailVerificationCode)
         .where(and_(EmailVerificationCode.user_id == user.id, EmailVerificationCode.is_used.is_(False)))
@@ -315,7 +315,7 @@ async def _create_and_send_verification_code(db: AsyncSession, user: User) -> No
             is_used=False,
         )
     )
-    await send_verification_code(user.email, code)
+    return code
 
 
 def _decode_refresh_token(refresh_token: str) -> dict:

@@ -2,11 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, require_role
 from app.core.database import get_db
 from app.core.redis_client import enforce_rate_limit
 from app.core.config import settings
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.schemas.auth import (
     AccessTokenResponse,
     ChangePasswordRequest,
@@ -162,3 +162,20 @@ async def forgot_password_endpoint(
 async def reset_password_endpoint(payload: ResetPasswordRequest, db: AsyncSession = Depends(get_db)) -> MessageResponse:
     await reset_password(db, payload)
     return MessageResponse(message="Parol muvaffaqiyatli tiklandi.")
+
+
+@router.get("/admin-only/", response_model=MessageResponse)
+async def admin_only_endpoint(current_user: User = Depends(require_role(UserRole.admin))) -> MessageResponse:
+    return MessageResponse(message=f"Admin access OK (user_id={current_user.id}).")
+
+
+@router.get("/hr-only/", response_model=MessageResponse)
+async def hr_only_endpoint(current_user: User = Depends(require_role(UserRole.hr))) -> MessageResponse:
+    return MessageResponse(message=f"HR access OK (user_id={current_user.id}).")
+
+
+@router.get("/candidate-only/", response_model=MessageResponse)
+async def candidate_only_endpoint(
+    current_user: User = Depends(require_role(UserRole.candidate)),
+) -> MessageResponse:
+    return MessageResponse(message=f"Candidate access OK (user_id={current_user.id}).")

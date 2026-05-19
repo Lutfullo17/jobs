@@ -1,17 +1,41 @@
+# Windows: agar "500 ... dockerDesktopLinuxEngine" bo'lsa — docker-reset.bat yoki:
+#   PowerShell: wsl --shutdown  keyin Docker Desktop'ni qayta oching.
+# Redis tashqi port 6500 (6379 Hyper-V diapazonida bo'lishi mumkin). Ichki: redis:6379.
+# API: http://localhost:8001/docs  (host 8001 -> konteyner 8000)
+
 services:
   app:
     build: .
     container_name: jobify-app
     command: sh -c "alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
-    ports:
-      - "8000:8000"
     env_file:
       - .env
+    environment:
+      PYTHONUNBUFFERED: "1"
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/jobify
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "8001:8000"
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     volumes:
       - ./:/app
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/')",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
 
   celery-worker:
     build: .
@@ -19,11 +43,18 @@ services:
     command: celery -A app.core.celery_app.celery_app worker --loglevel=info -Q celery
     env_file:
       - .env
+    environment:
+      PYTHONUNBUFFERED: "1"
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/jobify
+      REDIS_URL: redis://redis:6379/0
     depends_on:
-      - redis
-      - db
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     volumes:
       - ./:/app
+    restart: unless-stopped
 
   db:
     image: postgres:16
@@ -36,14 +67,26 @@ services:
       - "5432:5432"
     volumes:
       - pg_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d jobify"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
   redis:
     image: redis:7
     container_name: jobify-redis
-    # Windows: netsh excludedportrange ichida 6356-6455 (6379/6380 shu yerda). Tashqi portni bundan tashqariga qo'ying.
-    # Tashqi ulanish: localhost:6500 (ichki servislar baribir redis:6379).
     ports:
       - "6500:6379"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
 
 volumes:
   pg_data:

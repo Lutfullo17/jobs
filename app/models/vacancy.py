@@ -1,10 +1,5 @@
 """
 Vakansiyalar va nomzod murojaatlari.
-
-- Vacancy: HR yaratadi (faqat tasdiqlangan HR).
-- VacancyApplication: nomzod bitta vakansiyaga bir marta `initial_message` yuboradi.
-- HR: pending -> chat_open (suhbat ochiladi) yoki rejected.
-- ApplicationMessage: chat_open bo'lgandan keyingi qo'shimcha xabarlar (HR va nomzod).
 """
 
 import enum
@@ -19,9 +14,52 @@ from app.models.user import User
 
 
 class ApplicationStatus(str, enum.Enum):
-    pending = "pending"  # faqat boshlang'ich xabar bor, HR qaror kutmoqda
-    chat_open = "chat_open"  # HR qabul qildi — qo'shimcha xabarlar mumkin
-    rejected = "rejected"  # HR rad etdi
+    # Legacy (migratsiyadan qolgan)
+    pending = "pending"
+    chat_open = "chat_open"
+    rejected = "rejected"
+    # Pipeline
+    applied = "applied"
+    viewed = "viewed"
+    shortlisted = "shortlisted"
+    screening = "screening"
+    interview_scheduled = "interview_scheduled"
+    interviewed = "interviewed"
+    test_task = "test_task"
+    offer_sent = "offer_sent"
+    hired = "hired"
+    withdrawn = "withdrawn"
+
+
+# Suhbat ochiq bo'ladigan statuslar
+CHAT_ACTIVE_STATUSES = frozenset(
+    {
+        ApplicationStatus.chat_open,
+        ApplicationStatus.screening,
+        ApplicationStatus.shortlisted,
+        ApplicationStatus.interview_scheduled,
+        ApplicationStatus.interviewed,
+        ApplicationStatus.test_task,
+        ApplicationStatus.offer_sent,
+    }
+)
+
+
+class VacancyStatus(str, enum.Enum):
+    draft = "draft"
+    published = "published"
+    archived = "archived"
+    closed = "closed"
+    on_moderation = "on_moderation"
+    rejected_by_admin = "rejected_by_admin"
+
+
+class ExperienceLevel(str, enum.Enum):
+    intern = "intern"
+    junior = "junior"
+    middle = "middle"
+    senior = "senior"
+    lead = "lead"
 
 
 class EmploymentType(str, enum.Enum):
@@ -42,6 +80,7 @@ class Vacancy(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     hr_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    company_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("companies.id", ondelete="SET NULL"), nullable=True, index=True)
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
     company_name: Mapped[str] = mapped_column(String(255), default="", nullable=False)
@@ -56,6 +95,20 @@ class Vacancy(Base):
         nullable=False,
         default=WorkMode.office,
     )
+    status: Mapped[VacancyStatus] = mapped_column(
+        SAEnum(VacancyStatus, native_enum=False, validate_strings=True),
+        nullable=False,
+        default=VacancyStatus.draft,
+    )
+    experience_level: Mapped[ExperienceLevel | None] = mapped_column(
+        SAEnum(ExperienceLevel, native_enum=False, validate_strings=True),
+        nullable=True,
+    )
+    industry: Mapped[str] = mapped_column(String(120), default="", nullable=False)
+    skills_required: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    headcount: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    screening_questions: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    is_remote_worldwide: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     salary_from: Mapped[int | None] = mapped_column(Integer, nullable=True)
     salary_to: Mapped[int | None] = mapped_column(Integer, nullable=True)
     salary_currency: Mapped[str] = mapped_column(String(10), default="UZS", nullable=False)
@@ -68,11 +121,13 @@ class Vacancy(Base):
     contact_phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
     expires_at: Mapped[date | None] = mapped_column(Date, nullable=True)
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
+    company: Mapped["Company | None"] = relationship("Company", back_populates="vacancies")
     applications: Mapped[list["VacancyApplication"]] = relationship(
         "VacancyApplication", back_populates="vacancy"
     )
@@ -86,7 +141,15 @@ class VacancyApplication(Base):
     vacancy_id: Mapped[int] = mapped_column(Integer, ForeignKey("vacancies.id", ondelete="CASCADE"), index=True)
     candidate_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True)
     initial_message: Mapped[str] = mapped_column(Text, nullable=False)
-    status: Mapped[ApplicationStatus] = mapped_column(SAEnum(ApplicationStatus), nullable=False, default=ApplicationStatus.pending)
+    status: Mapped[ApplicationStatus] = mapped_column(
+        SAEnum(ApplicationStatus, native_enum=False, validate_strings=True),
+        nullable=False,
+        default=ApplicationStatus.applied,
+    )
+    hr_note: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    internal_comment: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    rating: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    rejection_reason: Mapped[str | None] = mapped_column(String(500), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

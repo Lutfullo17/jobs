@@ -9,7 +9,7 @@ from app.core.config import settings
 def send_email_task(to_email: str, subject: str, body: str) -> None:
     # SMTP login bo'lmasa local development uchun faqat print qilamiz.
     if not settings.smtp_user or not settings.smtp_password:
-        print(f"[EMAIL-DEV][CELERY] To={to_email} | Subject={subject} | Body={body}")
+        print(f"[EMAIL-DEV][CELERY] To={to_email} | Subject={subject} | Body={body}", flush=True)
         return
 
     message = EmailMessage()
@@ -18,8 +18,13 @@ def send_email_task(to_email: str, subject: str, body: str) -> None:
     message["Subject"] = subject
     message.set_content(body)
 
-    with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as server:
-        if settings.smtp_use_starttls:
-            server.starttls()
-        server.login(settings.smtp_user, settings.smtp_password)
-        server.send_message(message)
+    if settings.smtp_use_tls:
+        with smtplib.SMTP_SSL(settings.smtp_host, settings.smtp_port) as server:
+            server.login(settings.smtp_user, settings.smtp_password)
+            server.send_message(message)
+    else:
+        with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as server:
+            if settings.smtp_use_starttls:
+                server.starttls()
+            server.login(settings.smtp_user, settings.smtp_password)
+            server.send_message(message)

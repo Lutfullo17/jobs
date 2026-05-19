@@ -5,12 +5,10 @@ asyncpg
 alembic
 pydantic
 pydantic-settings
-python-jose
 PyJWT
 passlib[bcrypt]
 bcrypt==4.0.1
 email-validator
 redis
-aiosmtplib
 celery
 python-multipart

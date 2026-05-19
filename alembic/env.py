@@ -7,17 +7,30 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from app.core.config import settings
 from app.core.database import Base
-from app.models import (
+from app.models import (  # noqa: F401
     ApplicationMessage,
+    CandidateCertificate,
+    CandidateEducation,
+    CandidateExperience,
+    CandidateLanguage,
+    CandidateProfile,
+    CandidateResume,
+    CandidateSkill,
+    Company,
+    CompanyMember,
     EmailVerificationCode,
+    Interview,
+    Notification,
     PasswordResetCode,
     RefreshToken,
+    SavedSearch,
+    SavedVacancy,
     SupportMessage,
     SupportThread,
     User,
     Vacancy,
     VacancyApplication,
-)  # noqa: F401
+)
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.database_url)

@@ -1,6 +1,6 @@
-# JOBIFY AUTH MODULE (FastAPI, Async)
+# JOBIFY API (FastAPI, Async)
 
-Bu loyiha `Jobify / HeadHunter-like` platformasining **Auth** qismi uchun yozilgan.
+Bu loyiha `Jobify / HeadHunter-like` platformasi uchun yozilgan (auth, HR, vakansiyalar, support, rezume).
 Kodlar junior darajaga mos, sodda va tushunarli uslubda yozilgan.
 
 ## 1) Hozirgacha nima qilindi?
@@ -139,7 +139,20 @@ Base prefix: `/api/auth`
 - `GET /hr-only/`
 - `GET /candidate-only/`
 
-Swagger: `http://localhost:8000/docs`
+Swagger: `http://localhost:8001/docs`
+
+### Nomzod filterlari (Bearer token)
+
+| Endpoint | Vazifa |
+|----------|--------|
+| `GET /api/candidate/vacancies/` | Vakansiya qidiruv + pagination |
+| `GET /api/candidate/vacancies/filters/` | Filter variantlari (enum ro‘yxati) |
+| `GET /api/candidate/applications/` | Murojaatlar filter + pagination |
+| `GET /api/candidate/applications/filters/` | Murojaat filter variantlari |
+| `GET /api/candidate/favorites/` | Sevimlilar (`q`, `location`, `company_name`) |
+| `GET /api/candidate/saved-searches/{id}/results/` | Saqlangan qidiruvni ishga tushirish |
+
+Vakansiya qidiruv parametrlari: `q`, `location`, `company_name`, `employment_type`, `work_mode`, `experience_level`, `industry`, `skill`, `remote_only`, `verified_company_only`, `posted_within_days`, `salary_from`, `salary_to`, `exclude_applied`, `favorites_only`, `sort_by`, `page`, `page_size`.
 
 ---
 
@@ -227,23 +240,26 @@ Majburiy/asosiy qiymatlar:
 
 ## 8) Ishga tushirish (Docker bilan)
 
-1. `.env` fayl yarating:
-   - Windows: `.env.example` ni `.env` qilib nusxalang
-2. Docker’ni yoqing
-3. Quyidagini ishga tushiring:
+**Windows (tavsiya):** `docker-up.bat` — `.env` yaratadi va `docker compose up --build -d` ishga tushiradi.
 
-```bash
-docker compose up --build
-```
+Agar `500 ... dockerDesktopLinuxEngine` xatosi chiqsa: `docker-reset.bat`, keyin qayta `docker-up.bat`.
+
+Qo‘lda:
+
+1. `.env` — `.env.example` dan nusxa (`copy .env.example .env`)
+2. Docker Desktop ochiq bo‘lsin
+3. `docker compose up --build -d`
 
 Nima bo‘ladi:
-- `db` (PostgreSQL) ishga tushadi
-- `redis` ishga tushadi
-- `app` ishga tushishdan oldin `alembic upgrade head` bajaradi
-- `celery-worker` ishga tushadi
+- `db` (PostgreSQL, `localhost:5432`)
+- `redis` (tashqi `localhost:6500`, ichki `redis:6379`)
+- `app` — `alembic upgrade head`, keyin API
+- `celery-worker` — email navbatlari
 
-Swagger:
-- `http://localhost:8000/docs`
+Swagger: `http://localhost:8001/docs`  
+Tasdiqlash kodi: `logs-app.bat` yoki `docker compose logs -f app` → `[VERIFICATION-CODE]`
+
+**Gibrid (DB/Redis Docker, API lokal):** `run-with-docker.bat`
 
 ---
 
@@ -262,10 +278,14 @@ pip install -r requirements.txt
 alembic upgrade head
 ```
 
-4. API:
+4. API (port 8001, Docker Redis 6500):
 
 ```bash
-uvicorn main:app --reload
+# Windows: run.bat
+# yoki:
+set DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/jobify
+set REDIS_URL=redis://127.0.0.1:6500/0
+uvicorn main:app --reload --host 127.0.0.1 --port 8001
 ```
 
 5. Celery worker (alohida terminalda):
@@ -278,15 +298,14 @@ celery -A app.core.celery_app.celery_app worker --loglevel=info -Q celery
 
 ## 10) Hozircha soddalashtirilgan joylar
 
-- Email yuborish uchun SMTP sozlanmasa, dev fallback (`print`) ishlaydi.
+- Email yuborish uchun SMTP sozlanmasa, dev fallback (`stderr` / `[VERIFICATION-CODE]`) ishlaydi.
 - Hozir testlar (`pytest`) yozilmagan.
-- Admin yaratish seed/management command hali qo‘shilmagan.
+- Admin yaratish: `python scripts/create_admin.py` (yoki Docker: `docker compose run --rm app python scripts/create_admin.py`).
 
 ---
 
 ## 11) Keyingi tavsiya etiladigan ishlar
 
-- Admin create command (superuser) qo‘shish
 - Pytest testlar (auth flow bo‘yicha)
 - CI pipeline (lint + tests)
 - API response formatni yagona standardga o‘tkazish

@@ -2,7 +2,7 @@ from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
-from app.models.vacancy import ApplicationStatus, EmploymentType, WorkMode
+from app.models.vacancy import ApplicationStatus, EmploymentType, ExperienceLevel, VacancyStatus, WorkMode
 
 
 class HrStatusResponse(BaseModel):
@@ -16,14 +16,19 @@ class VacancyPublicListItem(BaseModel):
     id: int
     title: str
     company_name: str
+    company_id: int | None = None
     location: str
     employment_type: EmploymentType
     work_mode: WorkMode
+    experience_level: ExperienceLevel | None = None
+    industry: str = ""
     salary_from: int | None
     salary_to: int | None
     salary_currency: str
     salary_negotiable: bool
+    is_remote_worldwide: bool = False
     expires_at: date | None
+    published_at: datetime | None = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -56,8 +61,15 @@ class VacancyPublicDetail(BaseModel):
 class VacancyCreateBody(BaseModel):
     title: str = Field(min_length=1, max_length=200, description="Lavozim nomi")
     description: str = Field(min_length=1, max_length=16000, description="Kompaniya / lavozim haqida qisqa tavsif")
+    company_id: int | None = Field(None, description="Kompaniya ID (ixtiyoriy)")
     company_name: str = Field(min_length=1, max_length=255, description="Kompaniya nomi")
     location: str = Field(min_length=1, max_length=255, description="Hudud / shahar")
+    experience_level: ExperienceLevel | None = None
+    industry: str = ""
+    skills_required: str = ""
+    headcount: int = Field(default=1, ge=1)
+    screening_questions: str = ""
+    is_remote_worldwide: bool = False
     employment_type: EmploymentType = Field(description="Ish grafiki turi")
     work_mode: WorkMode = Field(description="Ofis, masofadan yoki aralash")
     responsibilities: str = Field(min_length=1, max_length=32000, description="Asosiy vazifalar")
@@ -80,13 +92,47 @@ class VacancyCreateBody(BaseModel):
         return self
 
 
+class VacancyUpdateBody(BaseModel):
+    title: str | None = Field(None, min_length=1, max_length=200)
+    description: str | None = Field(None, min_length=1, max_length=16000)
+    company_id: int | None = None
+    company_name: str | None = Field(None, max_length=255)
+    location: str | None = Field(None, max_length=255)
+    employment_type: EmploymentType | None = None
+    work_mode: WorkMode | None = None
+    experience_level: ExperienceLevel | None = None
+    industry: str | None = None
+    skills_required: str | None = None
+    headcount: int | None = Field(None, ge=1)
+    screening_questions: str | None = None
+    is_remote_worldwide: bool | None = None
+    responsibilities: str | None = None
+    requirements: str | None = None
+    benefits: str | None = None
+    salary_from: int | None = Field(None, ge=0)
+    salary_to: int | None = Field(None, ge=0)
+    salary_currency: str | None = None
+    salary_negotiable: bool | None = None
+    experience_note: str | None = None
+    education_note: str | None = None
+    contact_phone: str | None = None
+    expires_at: date | None = None
+
+
 class VacancyHrItem(BaseModel):
     id: int
     hr_id: int
+    company_id: int | None = None
+    status: VacancyStatus
     title: str
     description: str
     company_name: str
     location: str
+    experience_level: ExperienceLevel | None = None
+    industry: str = ""
+    skills_required: str = ""
+    headcount: int = 1
+    is_remote_worldwide: bool = False
     employment_type: EmploymentType
     work_mode: WorkMode
     salary_from: int | None
@@ -100,10 +146,17 @@ class VacancyHrItem(BaseModel):
     education_note: str
     contact_phone: str | None
     expires_at: date | None
+    published_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class VacancyActionResponse(BaseModel):
+    id: int
+    status: VacancyStatus
+    message: str
 
 
 class VacancyDeletedResponse(BaseModel):
@@ -140,6 +193,9 @@ class ApplicationHrListOut(BaseModel):
     candidate_email: EmailStr
     status: ApplicationStatus
     initial_message: str
+    hr_note: str = ""
+    rating: int | None = None
+    rejection_reason: str | None = None
     created_at: datetime
     resume_download_url: str | None = None
 
@@ -152,6 +208,10 @@ class ApplicationDetailOut(BaseModel):
     candidate_email: EmailStr
     status: ApplicationStatus
     initial_message: str
+    hr_note: str = ""
+    internal_comment: str = ""
+    rating: int | None = None
+    rejection_reason: str | None = None
     created_at: datetime
     resume_download_url: str | None = None
     chat_messages: list[ChatMessageOut]

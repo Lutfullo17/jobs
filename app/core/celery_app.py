@@ -19,4 +19,6 @@ celery_app.conf.update(
     task_publish_retry=False,
 )
 
-celery_app.autodiscover_tasks(["app.tasks"])
+# "app.tasks" emas "app" — autodiscover `app.tasks.tasks` qidiradi; bizda `email_tasks.py`.
+celery_app.autodiscover_tasks(["app"])
+import app.tasks.email_tasks  # noqa: F401 — workerda send_email_task ro'yxatdan o'tishi uchun

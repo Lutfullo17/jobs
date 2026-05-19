@@ -16,5 +16,5 @@ async def enforce_rate_limit(key: str, limit: int, window_seconds: int) -> bool:
             await redis_client.expire(key, window_seconds)
         return current <= limit
     except Exception:
-        # Redis ishlamay qolsa auth blok bo'lib qolmasin (fail-open).
-        return True
+        # Redis ishlamasa limit qo'llanmaydi — so'rov rad etiladi (xavfsizlik).
+        return False
