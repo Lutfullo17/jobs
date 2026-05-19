@@ -129,7 +129,13 @@ def upgrade() -> None:
     op.execute(sa.text("UPDATE vacancies SET status = 'published' WHERE status IS NULL"))
 
     # Application status: enum -> varchar + pipeline ustunlar
-    op.execute(sa.text("ALTER TABLE vacancy_applications ALTER COLUMN status TYPE VARCHAR(50) USING status::text"))
+    op.execute(sa.text("ALTER TABLE vacancy_applications ALTER COLUMN status DROP DEFAULT"))
+    op.execute(
+        sa.text(
+            "ALTER TABLE vacancy_applications ALTER COLUMN status TYPE VARCHAR(50) USING status::text"
+        )
+    )
+    op.execute(sa.text("ALTER TABLE vacancy_applications ALTER COLUMN status SET DEFAULT 'applied'"))
     op.execute(sa.text("DROP TYPE IF EXISTS applicationstatus"))
     op.add_column("vacancy_applications", sa.Column("hr_note", sa.Text(), server_default="", nullable=False))
     op.add_column("vacancy_applications", sa.Column("internal_comment", sa.Text(), server_default="", nullable=False))
